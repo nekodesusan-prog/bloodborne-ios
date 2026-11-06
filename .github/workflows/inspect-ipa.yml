@@ -1,0 +1,30 @@
+# Disassembles the published app around an address from a crash report (bb-ios.log's
+# "Host fault ... Bloodborne+0x...") and names the symbols there. Actions › Inspect IPA.
+name: Inspect IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      offset:
+        description: offset in the Bloodborne executable (hex, e.g. 0x1da9c)
+        required: true
+
+jobs:
+  inspect:
+    runs-on: macos-15
+    steps:
+      - name: Disassemble
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download ios-test -R "${{ github.repository }}" -p Bloodborne.ipa -D ipa
+          cd ipa && unzip -q Bloodborne.ipa
+          exe=Payload/Bloodborne.app/Bloodborne
+          off=$(( ${{ inputs.offset }} ))
+          base=$(otool -l "$exe" | awk '/segname __TEXT$/{f=1} f&&/vmaddr/{print $2; exit}')
+          addr=$(( base + off ))
+          printf 'TEXT vmaddr %s, address 0x%x\n' "$base" "$addr"
+          echo "== symbols before it"
+          nm -n "$exe" | awk -v a=$addr '{v=strtonum("0x"$1); if (v<=a) last=$0; else {print last; print $0; exit}}'
+          echo "== disassembly"
+          xcrun objdump -d --no-show-raw-insn --start-address=$(( addr - 0x140 )) --stop-address=$(( addr + 0x40 )) "$exe" | tail -100
