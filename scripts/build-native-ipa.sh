@@ -39,9 +39,10 @@ mkdir -p "$app"
     -o "$app/Bloodborne"
 # The bundle: Info.plist (the version from Git), the icon (actool), the game's patch file.
 version=$(git describe --tags --always 2>/dev/null | sed 's/^v//' || echo 0)
-short=$(date -u +%Y.%m.%d)
+# Apple's formats: up to three numbers (2026.11.6), and a build number that only grows.
+short=$(date -u +%Y.%-m.%-d)
 sed -e "s/<string>VERSION<\/string>/<string>$short<\/string>/" app/native/Info.plist > "$app/Info.plist"
-plutil -replace CFBundleVersion -string "$short.$(git rev-list --count HEAD 2>/dev/null || echo 0)" "$app/Info.plist"
+plutil -replace CFBundleVersion -string "$(date -u +%Y%m%d%H%M)" "$app/Info.plist"
 plutil -replace BBCommit -string "$version" "$app/Info.plist"
 printf 'APPL????' > "$app/PkgInfo"
 xcrun actool app/native/Assets.xcassets --compile "$app" --platform iphoneos --minimum-deployment-target 26.0 \

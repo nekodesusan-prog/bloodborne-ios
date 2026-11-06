@@ -122,7 +122,9 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
  * (bbport.ini aspect_ratio and output_res; app_main.c ios_output takes the width from the shape).
  * MetalFX scales the result up. Above 540 lines needs the increased memory limit. */
 - (BBSetting *)resolutionSetting {
-    CGSize native = UIScreen.mainScreen.nativeBounds.size;
+    CGSize native = CGSizeMake(4, 3);
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+        if ([scene isKindOfClass:UIWindowScene.class]) native = ((UIWindowScene *)scene).screen.nativeBounds.size;
     const double ratio = MAX(native.width, native.height) / MAX(1.0, MIN(native.width, native.height));
     NSMutableArray *values = [NSMutableArray array], *labels = [NSMutableArray array], *groups = [NSMutableArray array];
     void (^add)(NSString *, double, NSArray *, NSDictionary *) = ^(NSString *aspect, double r, NSArray *heights, NSDictionary *notes) {
