@@ -1,0 +1,88 @@
+# Builds the launcher's app with the game inside as an unsigned IPA (scripts/build-ipa.sh), on a
+# GitHub macOS runner: no Mac, no game files, no signing team. Install it with a sideloading tool
+# (Sideloadly signs it with your Apple ID), then copy your dump into the app's Documents/game.
+# Started by hand: Actions > iOS app (IPA) > Run workflow.
+name: iOS app (IPA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bbcpu_repo:
+        description: bbcpu repository for the runtime's bbcpu/ (the iOS JIT)
+        default: https://github.com/nekodesusan-prog/bbcpu.git
+      bbcpu_ref:
+        description: bbcpu branch or commit
+        default: ios-jit
+
+concurrency:
+  group: ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-26
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: bbcpu with the iOS JIT
+        run: |
+          git -C runtime/bbcpu fetch --depth 1 "${{ inputs.bbcpu_repo }}" "${{ inputs.bbcpu_ref }}"
+          git -C runtime/bbcpu checkout --detach FETCH_HEAD
+          git -C runtime/bbcpu log -1 --format='bbcpu %h %s'
+
+      # The launcher's project targets iOS 26: the newest Xcode on the runner.
+      - name: Xcode
+        run: |
+          xcode=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+          xcodebuild -downloadPlatform iOS || true
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Tools
+        run: |
+          brew install bash pkgconf glslang nasm cmake ninja
+          rustup target add aarch64-apple-ios
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Dependency cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            runtime/deps/build
+            runtime/deps/macos-arm64
+            runtime/deps/ios-arm64
+            runtime/deps/build-ios
+            runtime/build/deps-arm64
+          key: deps-${{ runner.os }}-${{ hashFiles('runtime/deps/**/*.cmake', 'runtime/deps/CMakeLists.txt', 'runtime/scripts/macos/build-deps.sh', 'runtime/scripts/ios/build-deps.sh') }}
+
+      # The iOS libraries are built from the sources the macOS script fetches (about an hour the
+      # first time; the cache keeps them).
+      - name: Dependencies
+        run: |
+          bash runtime/scripts/macos/build-deps.sh
+          bash runtime/scripts/ios/build-deps.sh
+
+      - name: Launcher front end
+        run: cd launcher && npm ci
+
+      - name: IPA
+        run: bash scripts/build-ipa.sh
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          tail -80 out/ipa/xcodebuild.log 2>/dev/null || true
+          tail -80 runtime/out/ios/gpu-build.log 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bloodborne-ipa
+          path: out/Bloodborne.ipa
+          retention-days: 14

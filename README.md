@@ -88,6 +88,22 @@ export BB_IOS_TEAM=<team id> BB_IOS_DEVICE=<iPhone identifier>
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
+## An IPA without a Mac (this fork)
+
+`.github/workflows/ipa.yml` builds the launcher's app with the game inside on a GitHub macOS
+runner (`scripts/build-ipa.sh`): Actions › iOS app (IPA) › Run workflow, then download the
+`Bloodborne-ipa` artifact. It holds no game files and no recompiled library; the runtime's
+`bbcpu/` is taken from the fork's `ios-jit` branch, where the translator runs once JIT is enabled
+through StikDebug (without JIT the game's code is interpreted, which is far too slow to play).
+
+1. Install `Bloodborne.ipa` with Sideloadly (or another sideloading tool) and your Apple ID. For
+   the increased memory limit, add it to the app's App ID with GetMoreRam and install again.
+2. Copy your dump into the app's `Documents/game` (Files, or the Apple Devices app's file sharing).
+3. Before Play: enable JIT for the app in StikDebug (LocalDevVPN on). The game's log says
+   `CPU: JIT through ...` when the translator is on.
+
+Not yet run on a device.
+
 ## Build and install
 
 The first time (the runtime's macOS build is needed first: its dependency sources are reused):
