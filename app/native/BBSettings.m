@@ -78,8 +78,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                      @"Türkçe", @"Suomi", @"Svenska", @"Dansk", @"Norsk", @"日本語", @"한국어", @"简体中文", @"繁體中文"], @"1"),
             Switch(@"skip_intro", BBStoreIni, @"Skip intro videos", nil, YES),
             Choice(@"overlay", BBStoreApp, @"Performance overlay",
-                   @"FPS only: a small counter in the corner. Metal HUD: Apple's overlay with FPS, frame time, GPU time and memory.",
-                   @[@"off", @"fps", @"metal"], @[@"Off", @"FPS only", @"Metal HUD"], @"fps"),
+                   @"FPS only: a small counter in the corner. Detailed: the game's own panel with FPS, frame time, memory and a frame-time graph. Metal HUD: Apple's overlay with GPU time too; after choosing it, close the app once (app switcher) so it starts with it.",
+                   @[@"off", @"fps", @"detailed", @"metal"], @[@"Off", @"FPS only", @"Detailed", @"Metal HUD"], @"fps"),
         ]),
         Section(@"Graphics", @"Turning effects off is lighter on the GPU. Takes effect at the next Play.", @[
             Choice(@"model_lod", BBStoreIni, @"Model detail", nil,
@@ -232,8 +232,9 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     /* The overlay: off, the runtime's small FPS counter, or Apple's Metal HUD (MTL_HUD_ENABLED,
      * which the runtime sets on the game's layer). */
     NSString *overlay = [self valueFor:@"overlay"];
-    ini[@"show_fps"] = [overlay isEqualToString:@"fps"] ? @"1" : @"0";
-    ini[@"fps_size"] = @"small";
+    const BOOL own = [overlay isEqualToString:@"fps"] || [overlay isEqualToString:@"detailed"];
+    ini[@"show_fps"] = own ? @"1" : @"0";
+    ini[@"fps_size"] = [overlay isEqualToString:@"detailed"] ? @"big" : @"small";
     ini[@"fps_position"] = @"top_left";
     if ([overlay isEqualToString:@"metal"]) setenv("MTL_HUD_ENABLED", "1", 1);
     else unsetenv("MTL_HUD_ENABLED");

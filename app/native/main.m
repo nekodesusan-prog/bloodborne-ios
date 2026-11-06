@@ -61,6 +61,11 @@ int bb_ios_start_game(const char *data_dir); /* app_main.c */
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
+        /* Apple's Metal HUD reads MTL_HUD_ENABLED when Metal starts in this process, which can be
+         * before Play: set at launch from the saved overlay choice (BBSettings "overlay"). The game's
+         * layer also asks for it (runtime mtl_present.mm). A change applies at the next launch. */
+        if ([[[NSUserDefaults standardUserDefaults] stringForKey:@"setting.overlay"] isEqualToString:@"metal"])
+            setenv("MTL_HUD_ENABLED", "1", 1);
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([BBAppDelegate class]));
     }
 }
