@@ -39,6 +39,9 @@ for f in AVFoundation AudioToolbox CoreAudio CoreBluetooth CoreFoundation CoreGr
          CoreMedia CoreMotion CoreVideo Foundation GameController IOSurface Metal MetalFX OpenGLES \
          QuartzCore Security UIKit UniformTypeIdentifiers VideoToolbox; do frameworks+=(-framework "$f"); done
 log=$out/xcodebuild.log
+# The project copies gen/apple/assets (Tauri's folder, not in Git) into the app; the front end is
+# embedded in the launcher's library (scripts/ios-rust.sh), so on a fresh checkout it is empty.
+mkdir -p "$launcher/src-tauri/gen/apple/assets"
 if ! (cd "$launcher/src-tauri/gen/apple" &&
       xcodebuild -project bloodborne-launcher.xcodeproj -scheme bloodborne-launcher_iOS -configuration "$config" \
           -destination 'generic/platform=iOS' -derivedDataPath "$out/xcode" \
