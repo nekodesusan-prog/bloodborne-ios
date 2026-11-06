@@ -70,6 +70,21 @@ jobs:
       - name: Dependencies
         run: |
           bash runtime/scripts/macos/build-deps.sh
+          # The iOS script reads the sources at deps/build/src/<name>; the macOS build now keeps
+          # them in deps/macos-arm64/.build/<name>-<version>-<key>/src/<name>. FFmpeg is copied:
+          # the iOS script cleans its source tree.
+          mkdir -p runtime/deps/build/src
+          for src in runtime/deps/macos-arm64/.build/*/src/*; do
+            name=$(basename "$src")
+            case $name in *-build|*-stamp|*-tmp) continue ;; esac
+            [[ -d $src ]] || continue
+            if [[ $name == ffmpeg ]]; then
+              rm -rf runtime/deps/build/src/ffmpeg && cp -R "$src" runtime/deps/build/src/ffmpeg
+            else
+              ln -sfn "$PWD/$src" "runtime/deps/build/src/$name"
+            fi
+          done
+          ls runtime/deps/build/src
           bash runtime/scripts/ios/build-deps.sh
 
       - name: Save dependency cache
