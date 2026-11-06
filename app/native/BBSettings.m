@@ -77,8 +77,9 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                      @"Español (Latinoamérica)", @"Français", @"Deutsch", @"Italiano", @"Nederlands", @"Polski", @"Русский",
                      @"Türkçe", @"Suomi", @"Svenska", @"Dansk", @"Norsk", @"日本語", @"한국어", @"简体中文", @"繁體中文"], @"1"),
             Switch(@"skip_intro", BBStoreIni, @"Skip intro videos", nil, YES),
-            Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Performance overlay",
-                   @"Apple's Metal HUD: FPS, frame time, GPU time and memory.", YES),
+            Choice(@"overlay", BBStoreApp, @"Performance overlay",
+                   @"FPS only: a small counter in the corner. Metal HUD: Apple's overlay with FPS, frame time, GPU time and memory.",
+                   @[@"off", @"fps", @"metal"], @[@"Off", @"FPS only", @"Metal HUD"], @"fps"),
         ]),
         Section(@"Graphics", @"Turning effects off is lighter on the GPU. Takes effect at the next Play.", @[
             Choice(@"model_lod", BBStoreIni, @"Model detail", nil,
@@ -228,8 +229,14 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     if (height < 360 || height > 1080) height = 540;
     ini[@"aspect_ratio"] = aspect;
     ini[@"output_res"] = [NSString stringWithFormat:@"%dx%d", height * 4 / 3, height];
-    /* The runtime's own counter off: the overlay is Apple's Metal HUD (MTL_HUD_ENABLED). */
-    ini[@"show_fps"] = @"0";
+    /* The overlay: off, the runtime's small FPS counter, or Apple's Metal HUD (MTL_HUD_ENABLED,
+     * which the runtime sets on the game's layer). */
+    NSString *overlay = [self valueFor:@"overlay"];
+    ini[@"show_fps"] = [overlay isEqualToString:@"fps"] ? @"1" : @"0";
+    ini[@"fps_size"] = @"small";
+    ini[@"fps_position"] = @"top_left";
+    if ([overlay isEqualToString:@"metal"]) setenv("MTL_HUD_ENABLED", "1", 1);
+    else unsetenv("MTL_HUD_ENABLED");
     [self writeIni:ini];
     /* The recompiled library (private build) on every thread but the physics ones (Havok), which
      * run on the JIT: in Central Yharnam 38-46 FPS against 19-24 with physics recompiled, where the
