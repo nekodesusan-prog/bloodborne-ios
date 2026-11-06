@@ -57,7 +57,9 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     if (!(self = [super init])) return nil;
     _documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
 
-    BBSetting *fpsSize = Choice(@"fps_size", BBStoreIni, @"Counter size", nil, @[@"small", @"big"], @[@"Small", @"Big"], @"small");
+    BBSetting *fpsSize = Choice(@"fps_size", BBStoreIni, @"Counter style",
+        @"FPS only; the performance bar (FPS, frame time, memory, battery), as Madeira's; or the detailed panel with a frame-time graph.",
+        @[@"small", @"bar", @"big"], @[@"FPS only", @"Performance bar", @"Detailed"], @"bar");
     fpsSize.parent = @"show_fps";
     BBSetting *fpsPosition = Choice(@"fps_position", BBStoreIni, @"Counter position", nil,
         @[@"top_left", @"top_center", @"top_right", @"bottom_left", @"bottom_center", @"bottom_right"],
@@ -83,7 +85,7 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                      @"Español (Latinoamérica)", @"Français", @"Deutsch", @"Italiano", @"Nederlands", @"Polski", @"Русский",
                      @"Türkçe", @"Suomi", @"Svenska", @"Dansk", @"Norsk", @"日本語", @"한국어", @"简体中文", @"繁體中文"], @"1"),
             Switch(@"skip_intro", BBStoreIni, @"Skip intro videos", nil, YES),
-            Switch(@"show_fps", BBStoreIni, @"Frame-rate counter", nil, YES),
+            Switch(@"show_fps", BBStoreIni, @"Performance overlay", nil, YES),
             fpsSize, fpsPosition,
         ]),
         Section(@"Graphics", @"Turning effects off is lighter on the GPU. Takes effect at the next Play.", @[
@@ -230,6 +232,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     /* What bloodborne-launcher set besides (game_environment): its in-game menu in English,
      * trophy notifications on. */
     setenv("BB_UI_LANGUAGE", "en", 0);
+    /* The performance bar reads the battery's charge (UIDevice): monitoring on, on the main thread. */
+    UIDevice.currentDevice.batteryMonitoringEnabled = YES;
     setenv("BB_TROPHY_OVERLAY", "1", 0);
 }
 

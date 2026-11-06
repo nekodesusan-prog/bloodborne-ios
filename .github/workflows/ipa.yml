@@ -13,6 +13,12 @@ on:
       bbcpu_ref:
         description: bbcpu branch or commit
         default: ios-jit
+      runtime_repo:
+        description: bloodborne-runtime repository for runtime/
+        default: https://github.com/nekodesusan-prog/bloodborne-runtime.git
+      runtime_ref:
+        description: runtime branch or commit (ios-overlay is the pinned runtime with the performance bar)
+        default: ios-overlay
 
 # contents: write publishes the IPA on the ios-test release.
 permissions:
@@ -32,6 +38,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      # The runtime first (its submodules at its own pins), then bbcpu over it.
+      - name: Runtime from the fork
+        run: |
+          git -C runtime fetch --depth 1 "${{ inputs.runtime_repo || 'https://github.com/nekodesusan-prog/bloodborne-runtime.git' }}" "${{ inputs.runtime_ref || 'ios-overlay' }}"
+          git -C runtime checkout --detach FETCH_HEAD
+          git -C runtime submodule update --init --recursive --depth 1
+          git -C runtime log -1 --format='runtime %h %s'
 
       - name: bbcpu with the iOS JIT
         run: |
