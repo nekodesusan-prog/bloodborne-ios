@@ -44,7 +44,7 @@ jobs:
 
       - name: Tools
         run: |
-          brew install bash pkgconf glslang nasm cmake ninja
+          brew install bash pkgconf glslang nasm cmake ninja xcodegen
           rustup target add aarch64-apple-ios
 
       - uses: actions/setup-node@v4
@@ -69,6 +69,12 @@ jobs:
           bash runtime/scripts/macos/build-deps.sh
           bash runtime/scripts/ios/build-deps.sh
 
+      - name: StikJIT cache
+        uses: actions/cache@v4
+        with:
+          path: out/stikjit
+          key: stikjit-2.0.1-${{ runner.os }}
+
       - name: Launcher front end
         run: cd launcher && npm ci
 
@@ -80,6 +86,7 @@ jobs:
         run: |
           tail -80 out/ipa/xcodebuild.log 2>/dev/null || true
           tail -80 runtime/out/ios/gpu-build.log 2>/dev/null || true
+          tail -60 out/stikjit/build.log 2>/dev/null || true
 
       - uses: actions/upload-artifact@v4
         with:

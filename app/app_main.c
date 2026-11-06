@@ -610,6 +610,9 @@ static int start(const char *data_dir) {
  * dispatch queue: UIKit is already up (Tauri's), so SDL's main does not run. DATA_DIR is the
  * launcher's data folder, the app's Documents as here. */
 void bb_ios_landscape(void); /* orientation.m */
+#ifdef BB_IOS_BUILTIN_JIT
+void bb_ios_enable_jit(const char *documents); /* jit_builtin.m (scripts/build-ipa.sh) */
+#endif
 static char launcher_data_dir[1024];
 /* The game, from a run-loop timer on the main thread (as SDL's own main starts it): run from the
  * launcher's block on the main dispatch queue, it never returned, and UIKit then delivered no
@@ -639,6 +642,11 @@ static void start_from_timer(CFRunLoopTimerRef timer, void *unused) {
         last = room;
     }
     report_room("when the game starts");
+#ifdef BB_IOS_BUILTIN_JIT
+    /* JIT through the app's StikJIT helper, before the game: bbcpu's code buffer is prepared and
+     * the debugger detaches here (without it, the game's code is interpreted). */
+    bb_ios_enable_jit(launcher_data_dir);
+#endif
     const int code = start(launcher_data_dir);
     printf("iOS PoC: the game could not start (%d)\n", code);
 }

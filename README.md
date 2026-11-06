@@ -94,13 +94,21 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 runner (`scripts/build-ipa.sh`): Actions › iOS app (IPA) › Run workflow, then download the
 `Bloodborne-ipa` artifact. It holds no game files and no recompiled library; the runtime's
 `bbcpu/` is taken from the fork's `ios-jit` branch, where the translator runs once JIT is enabled
-through StikDebug (without JIT the game's code is interpreted, which is far too slow to play).
+(without JIT the game's code is interpreted, which is far too slow to play).
 
-1. Install `Bloodborne.ipa` with Sideloadly (or another sideloading tool) and your Apple ID. For
-   the increased memory limit, add it to the app's App ID with GetMoreRam and install again.
-2. Copy your dump into the app's `Documents/game` (Files, or the Apple Devices app's file sharing).
-3. Before Play: enable JIT for the app in StikDebug (LocalDevVPN on). The game's log says
-   `CPU: JIT through ...` when the translator is on.
+JIT is enabled by the app itself when you press Play, as Madeira does: its helper extension
+(`app/JITHelper/`, `app/jit_builtin.m`) runs [StikJIT](https://github.com/StikDebug/StikJIT)
+(MPL-2.0, built from source by `scripts/build-jit-helper.sh`) through LocalDevVPN with your
+pairing file, and bbcpu's code buffer is prepared before the game starts.
+
+1. Install `Bloodborne.ipa` with Sideloadly (or another sideloading tool) and your Apple ID, and
+   keep its app extension. For the increased memory limit, add it to the app's App ID with
+   GetMoreRam and install again.
+2. Copy your dump into the app's `Documents/game`, and your pairing file to
+   `Documents/StikJIT/pairingFile.plist` (Files, or the Apple Devices app's file sharing).
+3. Turn LocalDevVPN on and press Play. The first time, the Developer Disk Image is downloaded
+   (the screen stays black up to a few minutes). The game's log (`Documents/bb-ios.log`) says
+   `iOS JIT: translator on` when it worked; StikDebug still works as before.
 
 Not yet run on a device.
 
