@@ -214,9 +214,12 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     ini[@"upscaler"] = [upscale isEqualToString:@"off"] ? @"off" : @"metalfx";
     if (![upscale isEqualToString:@"off"]) ini[@"preset"] = upscale;
     /* Resolution: the shape and the height (app_main.c ios_output takes the width from the shape). */
-    NSArray<NSString *> *resolution = [[self valueFor:@"resolution"] componentsSeparatedByString:@":"];
-    NSString *aspect = resolution.count == 2 ? resolution[0] : @"auto";
-    const int height = resolution.count == 2 ? resolution[1].intValue : 540;
+    /* "aspect:height", split at the last colon: the aspect has one of its own ("16:9:720"). */
+    NSString *resolution = [self valueFor:@"resolution"];
+    const NSRange last = [resolution rangeOfString:@":" options:NSBackwardsSearch];
+    NSString *aspect = last.location != NSNotFound ? [resolution substringToIndex:last.location] : @"auto";
+    int height = last.location != NSNotFound ? [resolution substringFromIndex:last.location + 1].intValue : 540;
+    if (height < 360 || height > 1080) height = 540;
     ini[@"aspect_ratio"] = aspect;
     ini[@"output_res"] = [NSString stringWithFormat:@"%dx%d", height * 4 / 3, height];
     [self writeIni:ini];

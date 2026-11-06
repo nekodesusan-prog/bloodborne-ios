@@ -162,6 +162,13 @@ __attribute__((constructor(100))) static void measure_free_block(void) {
     const char *home = getenv("HOME");
     char log[1100];
     snprintf(log, sizeof(log), "%s/Documents/bb-ios.log", home ? home : ".");
+    /* The previous start's log is kept as bb-ios.previous.log: opening the app again after a
+     * crash or a test would otherwise empty the log that tells what happened. */
+    {
+        char previous[1100];
+        snprintf(previous, sizeof(previous), "%s/Documents/bb-ios.previous.log", home ? home : ".");
+        rename(log, previous);
+    }
     /* Into the log file and to the original console too (devicectl ... --console streams it). */
     log_fd = open(log, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0644);
     console_fd = dup(2);

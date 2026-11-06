@@ -124,27 +124,51 @@ static NSString *PairingFile(NSString *documents) {
     if (self.onPlay) self.onPlay();
 }
 
+#pragma mark - Logs
+
+- (void)shareLogsFrom:(UIView *)source {
+    NSMutableArray<NSURL *> *files = [NSMutableArray array];
+    for (NSString *name in @[@"bb-ios.log", @"bb-ios.previous.log", @"bbport.ini"]) {
+        NSString *path = [_settings.documents stringByAppendingPathComponent:name];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:path]) [files addObject:[NSURL fileURLWithPath:path]];
+    }
+    if (!files.count) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"No log yet"
+            message:@"The game writes its log when it starts. Press Play once, then share it." preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    UIActivityViewController *share = [[UIActivityViewController alloc] initWithActivityItems:files applicationActivities:nil];
+    share.popoverPresentationController.sourceView = source;
+    share.popoverPresentationController.sourceRect = source.bounds;
+    [self presentViewController:share animated:YES completion:nil];
+}
+
 #pragma mark - Table
 
-/* Sections: 0 what the app found, 1..n the settings, n+1 reset. */
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return (NSInteger)_rows.count + 2; }
+/* Sections: 0 what the app found, 1..n the settings, n+1 the logs, n+2 reset. */
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return (NSInteger)_rows.count + 3; }
 
-- (BOOL)isReset:(NSInteger)section { return section == (NSInteger)_rows.count + 1; }
+- (BOOL)isLogs:(NSInteger)section { return section == (NSInteger)_rows.count + 1; }
+- (BOOL)isReset:(NSInteger)section { return section == (NSInteger)_rows.count + 2; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return (NSInteger)_status.count;
-    if ([self isReset:section]) return 1;
+    if ([self isReset:section] || [self isLogs:section]) return 1;
     return (NSInteger)_rows[section - 1].count;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Ready to play";
+    if ([self isLogs:section]) return @"Logs";
     if ([self isReset:section]) return nil;
     return _settings.sections[section - 1].title;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0) return @"Files go in Files › On My iPad › Bloodborne (or the Apple Devices app's file sharing).";
+    if ([self isLogs:section]) return @"bb-ios.log is the last game's log and bb-ios.previous.log the one before (also in Files › Bloodborne). Send them with a problem report.";
     if ([self isReset:section]) return @"Sets every setting back to the defaults this build was tested with.";
     return _settings.sections[section - 1].footer;
 }
@@ -164,6 +188,14 @@ static NSString *PairingFile(NSString *documents) {
         content.imageProperties.tintColor = ok ? UIColor.systemGreenColor : UIColor.systemOrangeColor;
         cell.contentConfiguration = content;
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        return cell;
+    }
+    if ([self isLogs:indexPath.section]) {
+        content = [UIListContentConfiguration cellConfiguration];
+        content.text = @"Share the game's logs";
+        content.image = [UIImage systemImageNamed:@"square.and.arrow.up"];
+        content.textProperties.color = self.view.tintColor;
+        cell.contentConfiguration = content;
         return cell;
     }
     if ([self isReset:indexPath.section]) {
@@ -238,6 +270,10 @@ static NSString *PairingFile(NSString *documents) {
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if ([self isLogs:indexPath.section]) {
+        [self shareLogsFrom:[tableView cellForRowAtIndexPath:indexPath]];
+        return;
+    }
     if (![self isReset:indexPath.section] || !_settings.anyChanged) return;
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Reset to tested defaults?"
         message:@"Every setting goes back to the defaults this build was tested with." preferredStyle:UIAlertControllerStyleAlert];
