@@ -434,9 +434,13 @@ void bb_ios_screen_pixels(int *width, int *height); /* orientation.m */
  * 540 when unset), at the screen's own ratio for auto (2868x1320: 1174x540), else at the chosen
  * ratio. bbport.ini gets that output, so the camera and the HUD follow it (the launcher writes the
  * file again at every Play). OUT: "WxH". */
-static void ios_output(const char *config, char *out, size_t out_size) {
-    char text[16384] = "", aspect[16] = "";
-    int chosen_height = 0;
+/* The game's render size (render) and the size it is shown at (out). Without an upscaler both
+ * are the screen's shape at most 540 lines high. With one (bbport.ini upscaler=metalfx, ...),
+ * the launcher's preset scales the output up from that render size, as on the Mac: Quality 1.5x,
+ * Balanced 1.7x, Performance 2x, Ultra Performance 3x (render 720x540: 1080x810 ... 2160x1620). */
+static void ios_output(const char *config, char *render, size_t render_size, char *out, size_t out_size) {
+    char text[16384] = "", aspect[16] = "", upscaler[16] = "off";
+    int chosen_height = 0, preset = 0;
     size_t length = 0;
     FILE *f = fopen(config, "r");
     if (f) {
@@ -447,6 +451,8 @@ static void ios_output(const char *config, char *out, size_t out_size) {
     for (char *line = text; line && *line;) {
         if (!strncmp(line, "aspect_ratio=", 13)) sscanf(line + 13, "%15[^\r\n]", aspect);
         if (!strncmp(line, "output_res=", 11)) sscanf(line + 11, "%*dx%d", &chosen_height);
+        if (!strncmp(line, "upscaler=", 9)) sscanf(line + 9, "%15[^\r\n]", upscaler);
+        if (!strncmp(line, "preset=", 7)) sscanf(line + 7, "%d", &preset);
         line = strchr(line, '\n');
         if (line) ++line;
     }
@@ -461,7 +467,13 @@ static void ios_output(const char *config, char *out, size_t out_size) {
     else if (!strcmp(aspect, "32:9")) ratio = 32.0 / 9.0;
     const int height = chosen_height >= 360 && chosen_height <= 540 ? chosen_height : 540;
     const int width = (int)(height * ratio / 2.0 + 0.5) * 2;
-    snprintf(out, out_size, "%dx%d", width, height);
+    snprintf(render, render_size, "%dx%d", width, height);
+    /* The runtime's presets (gpu/shim/bbport_settings.cpp PresetScale); TAA and off: no scaling. */
+    static const double scales[] = {1.0, 1.5, 1.7, 2.0, 3.0};
+    const int upscaling = strcmp(upscaler, "off") && strcmp(upscaler, "taa");
+    const double scale = upscaling && preset >= 0 && preset < 5 ? scales[preset] : 1.0;
+    const int out_h = (int)(height * scale / 2.0 + 0.5) * 2, out_w = (int)(width * scale / 2.0 + 0.5) * 2;
+    snprintf(out, out_size, "%dx%d", out_w, out_h);
     /* bbport.ini with that output (through a temporary file, so a crash keeps the old one). */
     char temp[1200];
     snprintf(temp, sizeof(temp), "%s.ios", config);
@@ -476,7 +488,8 @@ static void ios_output(const char *config, char *out, size_t out_size) {
     fprintf(w, "output_res=%s\n", out);
     if (screen_ratio) fputs("aspect_ratio=auto\n", w);
     if (fclose(w) == 0) rename(temp, config);
-    printf("iOS PoC: output %s (%s, the screen %dx%d)\n", out, screen_ratio ? "the screen's ratio" : aspect, screen_w, screen_h);
+    printf("iOS PoC: render %s, output %s (%s %.1fx; %s, the screen %dx%d)\n", render, out, upscaler, scale,
+           screen_ratio ? "the screen's ratio" : aspect, screen_w, screen_h);
 }
 #endif
 
@@ -527,9 +540,9 @@ static int start(const char *data_dir) {
     /* The game's output takes the screen's shape (ios_output below); BB_RENDER_RES and
      * BB_OUTPUT_RES set by a test run win. */
     {
-        char output[32];
-        ios_output(config, output, sizeof(output));
-        setenv("BB_RENDER_RES", output, 0);
+        char render[32], output[32];
+        ios_output(config, render, sizeof(render), output, sizeof(output));
+        setenv("BB_RENDER_RES", render, 0);
         setenv("BB_OUTPUT_RES", output, 0);
     }
 #endif
