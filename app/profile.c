@@ -7,7 +7,11 @@
  * suspended. The pcs are named afterwards: recompiled functions by their symbol in librecomp.dylib
  * (f_<guest offset>), translated code by the guest block it came from (bbcpu), the runtime and
  * system libraries by symbol. The log gets the shares by kind and the 12 busiest places. It holds
- * guest offsets and symbol names only, no game code. */
+ * guest offsets and symbol names only, no game code.
+ *
+ * While the thread is suspended its frame-pointer chain is read too (walk): for samples where it
+ * waits in the kernel, the log names the runtime function it waits in and the game function that
+ * called it; for the two busiest recompiled functions, the game functions that call them. */
 #include <dlfcn.h>
 #include <mach/mach.h>
 #include <pthread.h>
@@ -20,7 +24,7 @@
 
 uint64_t bbcpu_jit_guest_offset_at(uintptr_t pc); /* bbcpu (runtime/bbcpu, ios-jit) */
 
-enum { SAMPLES = 4000, PLACES = 1024, KINDS = 4 };
+enum { SAMPLES = 4000, PLACES = 1024, KINDS = 4, FRAMES = 12 };
 enum { RECOMPILED, TRANSLATED, RUNTIME, SYSTEM };
 static const char *const KIND_NAMES[KINDS] = {"recompiled", "JIT", "runtime", "system"};
 
@@ -109,11 +113,45 @@ static void name_pc(uintptr_t pc, char *out, size_t size, int *kind) {
     }
 }
 
+/* Return addresses up the frame-pointer chain of a suspended thread (lr first): read with
+ * vm_read_overwrite, which fails cleanly on a bad pointer and takes no lock the thread could hold. */
+static unsigned walk(const arm_thread_state64_t *state, uintptr_t *out) {
+    unsigned n = 0;
+    out[n++] = (uintptr_t)arm_thread_state64_get_lr(*state);
+    uint64_t fp = (uint64_t)arm_thread_state64_get_fp(*state);
+    while (n < FRAMES && fp && !(fp & 7)) {
+        uint64_t frame[2];
+        vm_size_t got = 0;
+        if (vm_read_overwrite(mach_task_self(), (vm_address_t)fp, sizeof(frame), (vm_address_t)frame, &got) != KERN_SUCCESS ||
+            got != sizeof(frame))
+            break;
+        const uint64_t ret = frame[1] & 0x0000ffffffffffffull;
+        if (!ret) break;
+        if (ret != out[n - 1]) out[n++] = (uintptr_t)ret;
+        if (frame[0] <= fp) break; /* the chain only goes up the stack */
+        fp = frame[0];
+    }
+    return n;
+}
+
+/* Whether a leaf is the thread waiting (a kernel wait), by its name. */
+static int is_wait(const char *where) {
+    return strstr(where, "psynch_cvwait") || strstr(where, "psynch_mutexwait") || strstr(where, "semwait") ||
+           strstr(where, "mach_msg") || strstr(where, "__ulock_wait") || strstr(where, "__workq_kernreturn");
+}
+
+static void top(Place *places, unsigned total, unsigned lines, const char *indent) {
+    qsort(places, PLACES, sizeof(*places), by_count);
+    for (unsigned i = 0; i < lines && places[i].count; ++i)
+        printf("%s%5.1f%% %s\n", indent, 100.0 * places[i].count / total, places[i].name);
+}
+
 static void *profile_loop(void *unused) {
     (void)unused;
     pthread_setname_np("bb:profile");
-    static uintptr_t pcs[SAMPLES];
-    static Place places[PLACES];
+    static uintptr_t pcs[SAMPLES], stacks[SAMPLES][FRAMES];
+    static unsigned depth[SAMPLES];
+    static Place places[PLACES], waits[PLACES], callers[2][PLACES];
     sleep(30); /* past the title screen's start */
     for (;;) {
         double share = 0;
@@ -128,8 +166,10 @@ static void *profile_loop(void *unused) {
             arm_thread_state64_t state;
             mach_msg_type_number_t count = ARM_THREAD_STATE64_COUNT;
             const kern_return_t got = thread_get_state(target, ARM_THREAD_STATE64, (thread_state_t)&state, &count);
+            unsigned frames = 0;
+            if (got == KERN_SUCCESS) frames = walk(&state, stacks[n]);
             thread_resume(target);
-            if (got == KERN_SUCCESS) pcs[n++] = (uintptr_t)arm_thread_state64_get_pc(state);
+            if (got == KERN_SUCCESS) pcs[n] = (uintptr_t)arm_thread_state64_get_pc(state), depth[n++] = frames;
             nanosleep(&tick, NULL);
         }
         mach_port_deallocate(mach_task_self(), target);
@@ -145,11 +185,62 @@ static void *profile_loop(void *unused) {
                 if (p) ++p->count;
             }
             qsort(places, PLACES, sizeof(*places), by_count);
-            printf("Profile: busiest thread '%s' (%.0f%% of a core), %u samples: recompiled %.0f%%, JIT %.0f%%, "
-                   "runtime %.0f%%, system %.0f%%\n", name, share, n, 100.0 * kinds[RECOMPILED] / n,
+            char clock[16];
+            const time_t now = time(NULL);
+            struct tm local;
+            strftime(clock, sizeof(clock), "%H:%M:%S", localtime_r(&now, &local));
+            printf("Profile %s: busiest thread '%s' (%.0f%% of a core), %u samples: recompiled %.0f%%, JIT %.0f%%, "
+                   "runtime %.0f%%, system %.0f%%\n", clock, name, share, n, 100.0 * kinds[RECOMPILED] / n,
                    100.0 * kinds[TRANSLATED] / n, 100.0 * kinds[RUNTIME] / n, 100.0 * kinds[SYSTEM] / n);
             for (unsigned i = 0; i < 12 && places[i].count; ++i)
                 printf("  %5.1f%% %-10s %s\n", 100.0 * places[i].count / n, KIND_NAMES[places[i].kind], places[i].name);
+            /* Waits: the runtime function waited in (the first frame of the app) and the game
+             * function that called it (the first recompiled or translated frame). Callers of the two
+             * busiest recompiled functions: the next game function up the stack. */
+            char hot[2][112] = {"", ""};
+            for (unsigned i = 0, h = 0; i < PLACES && h < 2 && places[i].count; ++i)
+                if (places[i].kind == RECOMPILED && strncmp(places[i].name, "rc_", 3))
+                    snprintf(hot[h++], sizeof(hot[0]), "%s", places[i].name);
+            memset(waits, 0, sizeof(waits));
+            memset(callers, 0, sizeof(callers));
+            unsigned waited = 0, in_hot[2] = {0, 0};
+            for (unsigned i = 0; i < n; ++i) {
+                char leaf[112], where[112], runtime[112] = "", game[112] = "";
+                int kind;
+                name_pc(pcs[i], leaf, sizeof(leaf), &kind);
+                const int wait = kind == SYSTEM && is_wait(leaf);
+                const int h = kind == RECOMPILED && hot[0][0] && !strcmp(leaf, hot[0]) ? 0
+                            : kind == RECOMPILED && hot[1][0] && !strcmp(leaf, hot[1]) ? 1 : -1;
+                if (!wait && h < 0) continue;
+                for (unsigned f = 0; f < depth[i] && !game[0]; ++f) {
+                    name_pc(stacks[i][f] - 4, where, sizeof(where), &kind);
+                    if (kind == RUNTIME && !runtime[0]) snprintf(runtime, sizeof(runtime), "%s", where);
+                    else if ((kind == RECOMPILED || kind == TRANSLATED) && strncmp(where, "rc_", 3) &&
+                             (h < 0 || strcmp(where, hot[h])))
+                        snprintf(game, sizeof(game), "%s", where);
+                }
+                char key[112];
+                if (wait) {
+                    ++waited;
+                    snprintf(key, sizeof(key), "%s in %s, from %s", leaf + (strchr(leaf, ' ') ? strchr(leaf, ' ') - leaf + 1 : 0),
+                             runtime[0] ? runtime : "?", game[0] ? game : "?");
+                    Place *p = place(waits, key, SYSTEM);
+                    if (p) ++p->count;
+                } else {
+                    ++in_hot[h];
+                    Place *p = place(callers[h], game[0] ? game : "?", RECOMPILED);
+                    if (p) ++p->count;
+                }
+            }
+            if (waited) {
+                printf("  waiting %.0f%% of samples, in (share of the waits):\n", 100.0 * waited / n);
+                top(waits, waited, 6, "    ");
+            }
+            for (int h = 0; h < 2; ++h)
+                if (in_hot[h]) {
+                    printf("  %s called from (share of its samples):\n", hot[h]);
+                    top(callers[h], in_hot[h], 4, "    ");
+                }
             fflush(stdout);
         }
         sleep(15);
