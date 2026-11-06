@@ -11,7 +11,8 @@
  * bb_ios_enable_jit waits on the main run loop until the process is debugged, then has bbcpu set
  * its translator up at once (bbcpu_jit_start), so the debugger detaches before the game starts.
  * Nothing here is fatal: without JIT the game's code is interpreted, as before.
- *   Documents/StikJIT/pairingFile.plist   the pairing file (or Documents/pairingFile.plist)
+ *   the pairing file                       in Documents or Documents/StikJIT, under any name
+ *                                         (pairingFile.plist, *.mobiledevicepairing)
  *   BB_IOS_JIT=0                          do not start the helper
  * Log lines start with "iOS JIT:". */
 #import <Foundation/Foundation.h>
@@ -66,10 +67,27 @@ static NSString *helper_identifier(void) {
     return nil;
 }
 
-static NSData *pairing_file(NSString *documents) {
-    for (NSString *name in @[@"StikJIT/pairingFile.plist", @"pairingFile.plist"]) {
-        NSData *data = [NSData dataWithContentsOfFile:[documents stringByAppendingPathComponent:name]];
-        if (data.length) return data;
+/* The pairing file: a lockdown pair record (a property list with HostID and HostPrivateKey),
+ * under whatever name it has (pairingFile.plist, *.mobiledevicepairing, ...) in Documents or
+ * Documents/StikJIT. What was looked at goes into *seen for the log. */
+static NSData *pairing_file(NSString *documents, NSMutableString *seen) {
+    NSFileManager *files = [NSFileManager defaultManager];
+    for (NSString *dir in @[documents, [documents stringByAppendingPathComponent:@"StikJIT"]]) {
+        NSArray<NSString *> *names = [files contentsOfDirectoryAtPath:dir error:nil];
+        for (NSString *name in names) {
+            [seen appendFormat:@"%s%@", seen.length ? ", " : "", name];
+            NSString *lower = name.lowercaseString;
+            if (![lower hasSuffix:@".plist"] && ![lower hasSuffix:@".mobiledevicepairing"] &&
+                ![lower hasPrefix:@"pairingfile"]) continue;
+            NSString *path = [dir stringByAppendingPathComponent:name];
+            NSData *data = [NSData dataWithContentsOfFile:path];
+            if (!data.length) continue;
+            id record = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:nil];
+            if ([record isKindOfClass:[NSDictionary class]] && record[@"HostID"] && record[@"HostPrivateKey"]) {
+                printf("iOS JIT: pairing file %s\n", path.UTF8String);
+                return data;
+            }
+        }
     }
     return nil;
 }
@@ -91,9 +109,12 @@ void bb_ios_enable_jit(const char *documents_path) {
             return;
         }
         NSString *documents = [NSString stringWithUTF8String:documents_path];
-        NSData *pairing = pairing_file(documents);
+        NSMutableString *seen = [NSMutableString string];
+        NSData *pairing = pairing_file(documents, seen);
         if (!pairing) {
-            printf("iOS JIT: no pairing file (Documents/StikJIT/pairingFile.plist); the game's code is interpreted\n");
+            printf("iOS JIT: no pairing file in %s or its StikJIT folder (a property list with HostID and "
+                   "HostPrivateKey); found: %s. The game's code is interpreted\n", documents_path,
+                   seen.length ? seen.UTF8String : "nothing");
             return;
         }
         NSString *identifier = helper_identifier();
