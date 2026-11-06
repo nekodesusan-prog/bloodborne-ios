@@ -100,8 +100,6 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
             Switch(@"effect_motion_blur", BBStoreIni, @"Motion blur", nil, NO),
             Switch(@"effect_chromatic_aberration", BBStoreIni, @"Chromatic aberration", nil, NO),
             Switch(@"effect_ssr", BBStoreIni, @"Screen-space reflections", @"Not in the original game.", NO),
-            Switch(@"perf_patch", BBStoreIni, @"Performance patch",
-                   @"Community patch (Kyo): some of the game's debug settings set for speed. May change some visuals.", NO),
             Switch(@"lower_physics", BBStoreIni, @"Lower object and corpse physics",
                    @"Community patch (Kyo): bodies and objects resist being pushed. Less physics work in crowded fights.", NO),
         ]),
