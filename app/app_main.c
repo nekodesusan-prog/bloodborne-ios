@@ -502,6 +502,7 @@ static void ios_output(const char *config, char *render, size_t render_size, cha
 }
 #endif
 
+void bb_ios_profile_start(void); /* profile.c */
 /* Sets up and runs the game; returns only if it could not start (as main's exit code). */
 static int start(const char *data_dir) {
     snprintf(documents, sizeof(documents), "%s", data_dir);
@@ -516,6 +517,7 @@ static int start(const char *data_dir) {
          * renderer's allocations take the gaps later. The runtime's own dlopen finds it loaded. */
         if (!dlopen(library, RTLD_NOW | RTLD_LOCAL)) printf("iOS PoC: early dlopen failed: %s\n", dlerror());
     }
+    bb_ios_profile_start(); /* profile.c: BB_IOS_PROFILE=1 */
     /* No extra direct memory past the PS4's 5056 MiB: it would cost address space (platform.h). */
     setenv("BB_DMEM_EXTRA_MB", "0", 0);
     /* 4608 MiB of direct memory instead of the PS4's 5056: the game allocates about 4589 MiB at

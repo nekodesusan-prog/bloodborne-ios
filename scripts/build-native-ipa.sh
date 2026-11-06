@@ -19,6 +19,7 @@ rm -rf "$out" && mkdir -p "$out/obj"
 cc=(xcrun -sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -g)
 game=(-DBB_IOS_IN_LAUNCHER -DBB_IOS_BUILTIN_JIT -I"$PWD/runtime/deps/ios-arm64/include")
 "${cc[@]}" "${game[@]}" -c app/app_main.c -o "$out/obj/app_main.o"
+"${cc[@]}" -Wall -Wextra -c app/profile.c -o "$out/obj/profile.o"
 for source in app/metal_test.m app/orientation.m app/jit_builtin.m; do
     "${cc[@]}" "${game[@]}" -fobjc-arc -c "$source" -o "$out/obj/$(basename "$source").o"
 done

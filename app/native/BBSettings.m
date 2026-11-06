@@ -114,8 +114,12 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                 @"Built-in JIT needs your pairing file in this app's folder (Files › Bloodborne, any name) and LocalDevVPN on. Without JIT the game's code is interpreted: far too slow to play.", @[
             Switch(@"BB_IOS_JIT", BBStoreEnv, @"Built-in JIT", @"Enabled through StikJIT when you press Play.", YES),
             Choice(@"recomp_threads", BBStoreApp, @"Recompiled game code",
-                   @"Only in the private build that carries the recompiled library. All but physics runs the physics threads (Havok) through the JIT; Off runs all of the game's code through the JIT.",
-                   @[@"all", @"not-physics", @"off"], @[@"On", @"All but physics", @"Off (JIT only)"], @"all"),
+                   @"Only in the private build that carries the recompiled library. The JIT runs the threads named here faster than the recompiled code (vector maths): physics (Havok), then cloth, then character updates. Off: everything on the JIT.",
+                   @[@"all", @"not-physics", @"not-physics-cloth", @"not-physics-cloth-chr", @"off"],
+                   @[@"On", @"All but physics", @"All but physics and cloth", @"All but physics, cloth, characters", @"Off (JIT only)"],
+                   @"not-physics"),
+            Switch(@"BB_IOS_PROFILE", BBStoreEnv, @"Busiest thread profile",
+                   @"Every 20 s the log names where the busiest thread spends its time. Costs a little speed.", NO),
             Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Metal performance HUD", @"Apple's overlay: frame time, GPU time, memory.", NO),
             Switch(@"BB_FRAME_STATS", BBStoreEnv, @"Performance lines in the log",
                    @"Frame statistics in bb-ios.log every few seconds, for reports.", YES),
@@ -236,13 +240,19 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     /* The recompiled library on or off. Off leaves BB_RECOMP_LIB empty (app_main.c sets it only when
      * unset), so bbcpu never loads it. */
     NSString *mode = [self valueFor:@"recomp_threads"];
-    const BOOL recomp = ![mode isEqualToString:@"off"], physics_on_jit = [mode isEqualToString:@"not-physics"];
+    const BOOL recomp = ![mode isEqualToString:@"off"];
+    /* Parts of host thread names: HavokWorkerThread; SpClothVertexUpdate, CSClothThread*;
+     * CSChrThread*, CSChrBackInitialize*. */
+    const char *on_jit = [mode isEqualToString:@"not-physics"] ? "Havok"
+                       : [mode isEqualToString:@"not-physics-cloth"] ? "Havok,Cloth"
+                       : [mode isEqualToString:@"not-physics-cloth-chr"] ? "Havok,Cloth,CSChr" : NULL;
     unsetenv("BB_RECOMP_THREADS"), unsetenv("BB_RECOMP_NOT_THREADS");
     if (recomp) unsetenv("BB_RECOMP_LIB");
     else setenv("BB_RECOMP_LIB", "", 1);
     /* bbcpu (ios-jit 18b8b36 on) runs the filtered threads' calls translated in the same loop. */
-    if (physics_on_jit) setenv("BB_RECOMP_NOT_THREADS", "Havok", 1);
-    printf("iOS app: recompiled game code %s\n", !recomp ? "off (JIT only)" : physics_on_jit ? "on, physics threads (Havok) on the JIT" : "on");
+    if (recomp && on_jit) setenv("BB_RECOMP_NOT_THREADS", on_jit, 1);
+    printf("iOS app: recompiled game code %s%s%s\n", !recomp ? "off (JIT only)" : "on",
+           recomp && on_jit ? "; on the JIT: threads named " : "", recomp && on_jit ? on_jit : "");
     /* The guest memory pool imported in windows, so no binding reaches past 4 GiB in one buffer:
      * the runtime's fix for stretched geometry ("vertex explosions", its docs/STABILITY.md), off on
      * iOS only because the windows' overlap is memory a 3.3 GB app could not spare. */
