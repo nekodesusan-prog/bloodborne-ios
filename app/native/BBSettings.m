@@ -111,6 +111,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         Section(@"Performance",
                 @"Built-in JIT needs your pairing file in this app's folder (Files › Bloodborne, any name) and LocalDevVPN on. Without JIT the game's code is interpreted: far too slow to play.", @[
             Switch(@"BB_IOS_JIT", BBStoreEnv, @"Built-in JIT", @"Enabled through StikJIT when you press Play.", YES),
+            Switch(@"efficiency_threads", BBStoreApp, @"Background threads on efficiency cores",
+                   @"Audio mixing, file loading, network and saving run on the iPad's low-power cores: less heat. If sound crackles or loading gets slow, turn it off.", NO),
             Switch(@"BB_FRAME_STATS", BBStoreEnv, @"Performance lines in the log",
                    @"Frame statistics in bb-ios.log every few seconds, for reports.", YES),
         ]),
@@ -241,6 +243,12 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     if (physics_recompiled) unsetenv("BB_RECOMP_NOT_THREADS");
     else setenv("BB_RECOMP_NOT_THREADS", "Havok", 1);
     printf("iOS app: recompiled game code on %s\n", physics_recompiled ? "every thread (physics too)" : "every thread but physics (Havok)");
+    /* Game threads off the frame's critical path at utility QoS (runtime BB_EFFICIENCY_THREADS):
+     * FMOD's mixer used 19-26% of a performance core in Central Yharnam. */
+    if ([[self valueFor:@"efficiency_threads"] boolValue]) {
+        setenv("BB_EFFICIENCY_THREADS", "FMOD,Core.Res,NexusRevolution,CSTrophy,Core.Logging,DLUserPreference,SLSession,FrpgSaveLoadMan,FaceGenMan", 1);
+        printf("iOS app: background game threads on the efficiency cores\n");
+    } else unsetenv("BB_EFFICIENCY_THREADS");
     /* The runtime's wake log, following the physics threads (BB_WAKE_THREAD=Havok). */
     if ([[self valueFor:@"physics_wait_log"] boolValue]) {
         setenv("BB_WAKE_STATS", "1", 1);
