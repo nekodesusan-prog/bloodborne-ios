@@ -13,6 +13,12 @@ on:
       bbcpu_ref:
         description: bbcpu branch or commit
         default: ios-jit
+      launcher_repo:
+        description: bloodborne-launcher repository for launcher/
+        default: https://github.com/nekodesusan-prog/bloodborne-launcher.git
+      launcher_ref:
+        description: launcher branch or commit
+        default: main
 
 # contents: write publishes the IPA on the ios-test release.
 permissions:
@@ -38,6 +44,12 @@ jobs:
           git -C runtime/bbcpu fetch --depth 1 "${{ inputs.bbcpu_repo }}" "${{ inputs.bbcpu_ref }}"
           git -C runtime/bbcpu checkout --detach FETCH_HEAD
           git -C runtime/bbcpu log -1 --format='bbcpu %h %s'
+
+      - name: Launcher from the fork
+        run: |
+          git -C launcher fetch --depth 1 "${{ inputs.launcher_repo }}" "${{ inputs.launcher_ref }}"
+          git -C launcher checkout --detach FETCH_HEAD
+          git -C launcher log -1 --format='launcher %h %s'
 
       # The newest Xcode on the runner (27.1 on xcode-27).
       - name: Xcode
