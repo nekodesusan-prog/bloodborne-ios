@@ -1,4 +1,4 @@
-# Builds the launcher's app with the game inside as an unsigned IPA (scripts/build-ipa.sh), on a
+# Builds the native app with the game inside as an unsigned IPA (scripts/build-native-ipa.sh), on a
 # GitHub macOS runner: no Mac, no game files, no signing team. Install it with a sideloading tool
 # (Sideloadly signs it with your Apple ID), then copy your dump into the app's Documents/game.
 # Started by hand: Actions > iOS app (IPA) > Run workflow.
@@ -13,12 +13,6 @@ on:
       bbcpu_ref:
         description: bbcpu branch or commit
         default: ios-jit
-      launcher_repo:
-        description: bloodborne-launcher repository for launcher/
-        default: https://github.com/nekodesusan-prog/bloodborne-launcher.git
-      launcher_ref:
-        description: launcher branch or commit
-        default: main
 
 # contents: write publishes the IPA on the ios-test release.
 permissions:
@@ -45,12 +39,6 @@ jobs:
           git -C runtime/bbcpu checkout --detach FETCH_HEAD
           git -C runtime/bbcpu log -1 --format='bbcpu %h %s'
 
-      - name: Launcher from the fork
-        run: |
-          git -C launcher fetch --depth 1 "${{ inputs.launcher_repo }}" "${{ inputs.launcher_ref }}"
-          git -C launcher checkout --detach FETCH_HEAD
-          git -C launcher log -1 --format='launcher %h %s'
-
       # The newest Xcode on the runner (27.1 on xcode-27).
       - name: Xcode
         run: |
@@ -63,11 +51,6 @@ jobs:
       - name: Tools
         run: |
           brew install bash pkgconf glslang nasm cmake ninja xcodegen
-          rustup target add aarch64-apple-ios
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
 
       - name: StikJIT cache
         uses: actions/cache@v4
@@ -80,6 +63,9 @@ jobs:
       - name: JIT helper (quick check)
         run: |
           xcrun -sdk iphoneos clang -target arm64-apple-ios18.0 -fobjc-arc -Wall -fsyntax-only app/jit_builtin.m
+          for source in app/native/*.m; do
+            xcrun -sdk iphoneos clang -target arm64-apple-ios26.0 -fobjc-arc -Wall -Wextra -Wno-unused-parameter -fsyntax-only "$source"
+          done
           check=out/check/Check.app
           rm -rf out/check && mkdir -p "$check"
           plutil -create xml1 "$check/Info.plist"
@@ -138,21 +124,19 @@ jobs:
             runtime/build/deps-arm64
           key: ${{ steps.deps.outputs.cache-primary-key }}
 
-      - name: Launcher front end
-        run: cd launcher && npm ci
-
       # The runtime's iOS core is compiled with -Werror; a newer compiler's new warnings should
       # not stop this build (they still show in the log).
       - name: Warnings not fatal in the runtime's iOS core
         run: sed -i '' 's/-Werror/-Wno-error/g' runtime/scripts/ios/build-core.sh
 
+      # The native app (app/native/): a settings screen before Play, in place of the launcher.
       - name: IPA
-        run: bash scripts/build-ipa.sh
+        run: bash scripts/build-native-ipa.sh
 
       - name: Logs on failure
         if: failure()
         run: |
-          tail -80 out/ipa/xcodebuild.log 2>/dev/null || true
+          tail -80 out/native/actool.log 2>/dev/null || true
           tail -80 runtime/out/ios/gpu-build.log 2>/dev/null || true
           tail -60 out/stikjit/build.log 2>/dev/null || true
 

@@ -90,8 +90,15 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
 ## An IPA without a Mac (this fork)
 
-`.github/workflows/ipa.yml` builds the launcher's app with the game inside on a GitHub macOS
-runner (`scripts/build-ipa.sh`): Actions › iOS app (IPA) › Run workflow. The IPA is published
+`.github/workflows/ipa.yml` builds the native app with the game inside on a GitHub macOS runner
+(`scripts/build-native-ipa.sh`): Actions › iOS app (IPA) › Run workflow. The native app
+(`app/native/`) replaces bloodborne-launcher's Tauri app on iOS, as nxnative's screen does: one
+scrollable page before Play shows what the app found (the game's files, the pairing file, the
+memory iOS allows) and every setting under Game, Graphics, Controls and Performance, with the
+defaults it was tested with and a reset to them; only changed values are stored. Play writes
+them to `bbport.ini` and the environment, as the launcher did, and starts the game in the same
+process. It keeps the launcher app's bundle ID, so it installs over it with Documents kept.
+`scripts/build-ipa.sh` still builds the launcher's app. The IPA is published
 as a plain file on the fork's `ios-test` pre-release
 (`releases/download/ios-test/Bloodborne.ipa`, `scripts/publish-ipa.sh`); the `Bloodborne-ipa`
 artifact has the same file in a zip. Publish IPA (`.github/workflows/publish-ipa.yml`) publishes
