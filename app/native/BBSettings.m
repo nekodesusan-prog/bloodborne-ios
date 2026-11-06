@@ -118,6 +118,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @[@"all", @"not-physics", @"not-physics-cloth", @"not-physics-cloth-chr", @"off"],
                    @[@"On", @"All but physics", @"All but physics and cloth", @"All but physics, cloth, characters", @"Off (JIT only)"],
                    @"not-physics"),
+            Switch(@"bigger_render_cache", BBStoreApp, @"Larger render resource cache (512 MB)",
+                   @"Test: 512 MB of extra game memory for the game's render resource cache (160 MB otherwise), as on the Mac. If the game does not start, turn it off.", NO),
             Switch(@"hot_on_jit", BBStoreApp, @"Main thread's two busiest functions on the JIT",
                    @"Test: the two game functions the profile finds busiest on the main thread run through the JIT instead of the recompiled code.", NO),
             Switch(@"BB_IOS_PROFILE", BBStoreEnv, @"Busiest thread profile",
@@ -259,6 +261,14 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     const BOOL hot_on_jit = recomp && [[self valueFor:@"hot_on_jit"] boolValue];
     if (hot_on_jit) setenv("BB_RECOMP_OFF", "0x21b89a0,0x21b8710", 1);
     else unsetenv("BB_RECOMP_OFF");
+    /* 512 MiB of direct memory past the game's (the runtime's default on the Mac; app_main.c sets
+     * 0 on iOS when unset) for the render resource cache's larger backing. It goes inside the
+     * guest block at 0x7000000000, where ~640 MiB past the pool is unused: a test of whether it
+     * fits with this layout. */
+    if ([[self valueFor:@"bigger_render_cache"] boolValue]) {
+        setenv("BB_DMEM_EXTRA_MB", "512", 1);
+        printf("iOS app: 512 MiB extra direct memory for the render resource cache\n");
+    } else unsetenv("BB_DMEM_EXTRA_MB");
     /* The profile switch also turns on the runtime's record of who wakes the main thread. */
     if ([[self valueFor:@"BB_IOS_PROFILE"] boolValue]) setenv("BB_WAKE_STATS", "1", 1);
     else unsetenv("BB_WAKE_STATS");
