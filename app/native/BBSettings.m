@@ -118,6 +118,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @[@"all", @"not-physics", @"not-physics-cloth", @"not-physics-cloth-chr", @"off"],
                    @[@"On", @"All but physics", @"All but physics and cloth", @"All but physics, cloth, characters", @"Off (JIT only)"],
                    @"not-physics"),
+            Switch(@"sema_spin", BBStoreApp, @"Main thread waits awake briefly",
+                   @"Test: before the main thread sleeps waiting for a physics or graphics job, it waits up to 40 microseconds awake; most of those jobs finish sooner. Uses a little more power.", NO),
             Switch(@"bigger_render_cache", BBStoreApp, @"Larger render resource cache (512 MB)",
                    @"Test: 512 MB of extra game memory for the game's render resource cache (160 MB otherwise), as on the Mac. If the game does not start, turn it off.", NO),
             Switch(@"hot_on_jit", BBStoreApp, @"Main thread's two busiest functions on the JIT",
@@ -269,6 +271,12 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         setenv("BB_DMEM_EXTRA_MB", "512", 1);
         printf("iOS app: 512 MiB extra direct memory for the render resource cache\n");
     } else unsetenv("BB_DMEM_EXTRA_MB");
+    /* The main thread's semaphore waits (about 10,000 per 10 s at 0.02-0.07 ms in Central Yharnam)
+     * spin up to 40 us before sleeping (runtime BB_SEMA_SPIN_US). */
+    if ([[self valueFor:@"sema_spin"] boolValue]) {
+        setenv("BB_SEMA_SPIN_US", "40", 1);
+        printf("iOS app: main thread spins up to 40 us before sleeping on a semaphore\n");
+    } else unsetenv("BB_SEMA_SPIN_US");
     /* The profile switch also turns on the runtime's record of who wakes the main thread. */
     if ([[self valueFor:@"BB_IOS_PROFILE"] boolValue]) setenv("BB_WAKE_STATS", "1", 1);
     else unsetenv("BB_WAKE_STATS");
