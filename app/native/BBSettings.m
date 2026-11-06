@@ -58,15 +58,6 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     if (!(self = [super init])) return nil;
     _documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
 
-    BBSetting *fpsSize = Choice(@"fps_size", BBStoreIni, @"Counter style",
-        @"FPS only; the performance bar (FPS, frame time, memory, battery), as Madeira's; or the detailed panel with a frame-time graph.",
-        @[@"small", @"bar", @"big"], @[@"FPS only", @"Performance bar", @"Detailed"], @"bar");
-    fpsSize.parent = @"show_fps";
-    BBSetting *fpsPosition = Choice(@"fps_position", BBStoreIni, @"Counter position", nil,
-        @[@"top_left", @"top_center", @"top_right", @"bottom_left", @"bottom_center", @"bottom_right"],
-        @[@"Top left", @"Top center", @"Top right", @"Bottom left", @"Bottom center", @"Bottom right"], @"top_left");
-    fpsPosition.parent = @"show_fps";
-
     _sections = @[
         Section(@"Game", nil, @[
             Choice(@"BB_FPS", BBStoreEnv, @"Frame rate",
@@ -78,7 +69,7 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @"MetalFX draws the game at the render resolution and scales it up: sharper, at a small GPU cost.",
                    @[@"off", @"1", @"2", @"3", @"4"],
                    @[@"Off", @"MetalFX ×1.5 (Quality)", @"MetalFX ×1.7 (Balanced)", @"MetalFX ×2 (Performance)",
-                     @"MetalFX ×3 (Ultra Performance)"], @"off"),
+                     @"MetalFX ×3 (Ultra Performance)"], @"1"),
             [self resolutionSetting],
             Choice(@"BB_LANGUAGE", BBStoreEnv, @"Game language", nil,
                    @[@"1", @"18", @"17", @"7", @"3", @"20", @"2", @"4", @"5", @"6", @"16", @"8", @"19", @"12", @"13", @"14", @"15", @"0", @"9", @"11", @"10"],
@@ -86,14 +77,14 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                      @"Español (Latinoamérica)", @"Français", @"Deutsch", @"Italiano", @"Nederlands", @"Polski", @"Русский",
                      @"Türkçe", @"Suomi", @"Svenska", @"Dansk", @"Norsk", @"日本語", @"한국어", @"简体中文", @"繁體中文"], @"1"),
             Switch(@"skip_intro", BBStoreIni, @"Skip intro videos", nil, YES),
-            Switch(@"show_fps", BBStoreIni, @"Performance overlay", nil, YES),
-            fpsSize, fpsPosition,
+            Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Performance overlay",
+                   @"Apple's Metal HUD: FPS, frame time, GPU time and memory.", YES),
         ]),
         Section(@"Graphics", @"Turning effects off is lighter on the GPU. Takes effect at the next Play.", @[
             Choice(@"model_lod", BBStoreIni, @"Model detail", nil,
-                   @[@"-2", @"0", @"1", @"2"], @[@"Highest", @"As in the game", @"Lower", @"Lowest"], @"0"),
-            Switch(@"effect_dynamic_shadows", BBStoreIni, @"Dynamic light shadows", nil, YES),
-            Switch(@"effect_ssao", BBStoreIni, @"Ambient occlusion (SSAO)", nil, YES),
+                   @[@"-2", @"0", @"1", @"2"], @[@"Highest", @"As in the game", @"Lower", @"Lowest"], @"2"),
+            Switch(@"effect_dynamic_shadows", BBStoreIni, @"Dynamic light shadows", nil, NO),
+            Switch(@"effect_ssao", BBStoreIni, @"Ambient occlusion (SSAO)", nil, NO),
             Switch(@"effect_game_aa", BBStoreIni, @"Game anti-aliasing", nil, YES),
             Switch(@"effect_bloom", BBStoreIni, @"Bloom", nil, NO),
             Switch(@"effect_dof", BBStoreIni, @"Depth of field", nil, NO),
@@ -101,9 +92,9 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
             Switch(@"effect_chromatic_aberration", BBStoreIni, @"Chromatic aberration", nil, NO),
             Switch(@"effect_ssr", BBStoreIni, @"Screen-space reflections", @"Not in the original game.", NO),
             Switch(@"perf_patch", BBStoreIni, @"Performance patch",
-                   @"Community patch (Kyo): some of the game's debug settings set for speed. May change some visuals.", NO),
+                   @"Community patch (Kyo): some of the game's debug settings set for speed. May change some visuals.", YES),
             Switch(@"lower_physics", BBStoreIni, @"Lower object and corpse physics",
-                   @"Community patch (Kyo): bodies and objects resist being pushed. Less physics work in crowded fights.", NO),
+                   @"Community patch (Kyo): bodies and objects resist being pushed. Less physics work in crowded fights.", YES),
         ]),
         Section(@"Controls", nil, @[
             Choice(@"BB_TOUCH_CONTROLS", BBStoreEnv, @"On-screen controls",
@@ -113,22 +104,6 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         Section(@"Performance",
                 @"Built-in JIT needs your pairing file in this app's folder (Files › Bloodborne, any name) and LocalDevVPN on. Without JIT the game's code is interpreted: far too slow to play.", @[
             Switch(@"BB_IOS_JIT", BBStoreEnv, @"Built-in JIT", @"Enabled through StikJIT when you press Play.", YES),
-            Choice(@"recomp_threads", BBStoreApp, @"Recompiled game code",
-                   @"Only in the private build that carries the recompiled library. The JIT runs the threads named here faster than the recompiled code (vector maths): physics (Havok), then cloth, then character updates. Off: everything on the JIT.",
-                   @[@"all", @"not-physics", @"not-physics-cloth", @"not-physics-cloth-chr", @"off"],
-                   @[@"On", @"All but physics", @"All but physics and cloth", @"All but physics, cloth, characters", @"Off (JIT only)"],
-                   @"not-physics"),
-            Switch(@"sema_spin", BBStoreApp, @"Main thread waits awake briefly",
-                   @"Test: before the main thread sleeps waiting for a physics or graphics job, it waits up to 40 microseconds awake; most of those jobs finish sooner. Uses a little more power.", NO),
-            Switch(@"bigger_render_cache", BBStoreApp, @"Larger render resource cache (512 MB)",
-                   @"Test: 512 MB of extra game memory for the game's render resource cache (160 MB otherwise), as on the Mac. If the game does not start, turn it off.", NO),
-            Switch(@"hot_on_jit", BBStoreApp, @"Main thread's two busiest functions on the JIT",
-                   @"Test: the two game functions the profile finds busiest on the main thread run through the JIT instead of the recompiled code.", NO),
-            Choice(@"BB_IOS_PROFILE_THREAD", BBStoreEnv, @"Profile which thread", @"With the profile on: the busiest thread, or the busiest physics (Havok) thread.",
-                   @[@"", @"Havok"], @[@"Busiest", @"Physics (Havok)"], @""),
-            Switch(@"BB_IOS_PROFILE", BBStoreEnv, @"Busiest thread profile",
-                   @"Every 20 s the log names where the busiest thread spends its time, and every 10 s which threads the main thread waited for. Costs a little speed.", NO),
-            Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Metal performance HUD", @"Apple's overlay: frame time, GPU time, memory.", NO),
             Switch(@"BB_FRAME_STATS", BBStoreEnv, @"Performance lines in the log",
                    @"Frame statistics in bb-ios.log every few seconds, for reports.", YES),
         ]),
@@ -169,7 +144,7 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     }
     BBSetting *s = Choice(@"resolution", BBStoreApp, @"Resolution",
         @"The size the game draws at. Larger is sharper and heavier; above 540 lines needs the increased memory limit (GetMoreRam). MetalFX scales it up.",
-        values, labels, @"auto:540");
+        values, labels, @"16:9:540");
     s.groups = groups;
     return s;
 }
@@ -244,47 +219,19 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     if (height < 360 || height > 1080) height = 540;
     ini[@"aspect_ratio"] = aspect;
     ini[@"output_res"] = [NSString stringWithFormat:@"%dx%d", height * 4 / 3, height];
+    /* The runtime's own counter off: the overlay is Apple's Metal HUD (MTL_HUD_ENABLED). */
+    ini[@"show_fps"] = @"0";
     [self writeIni:ini];
-    /* The recompiled library on or off. Off leaves BB_RECOMP_LIB empty (app_main.c sets it only when
-     * unset), so bbcpu never loads it. */
-    NSString *mode = [self valueFor:@"recomp_threads"];
-    const BOOL recomp = ![mode isEqualToString:@"off"];
-    /* Parts of host thread names: HavokWorkerThread; SpClothVertexUpdate, CSClothThread*;
-     * CSChrThread*, CSChrBackInitialize*. */
-    const char *on_jit = [mode isEqualToString:@"not-physics"] ? "Havok"
-                       : [mode isEqualToString:@"not-physics-cloth"] ? "Havok,Cloth"
-                       : [mode isEqualToString:@"not-physics-cloth-chr"] ? "Havok,Cloth,CSChr" : NULL;
-    unsetenv("BB_RECOMP_THREADS"), unsetenv("BB_RECOMP_NOT_THREADS");
-    if (recomp) unsetenv("BB_RECOMP_LIB");
-    else setenv("BB_RECOMP_LIB", "", 1);
-    /* bbcpu (ios-jit 18b8b36 on) runs the filtered threads' calls translated in the same loop. */
-    if (recomp && on_jit) setenv("BB_RECOMP_NOT_THREADS", on_jit, 1);
-    /* The main thread's two busiest recompiled functions in the in-app profile (Central Yharnam:
-     * 11-17% and 6-10% of its samples), by guest offset in the 1.09 executable, left to the JIT
-     * (bbcpu's BB_RECOMP_OFF), to see whether the JIT runs them faster as it does physics. */
-    const BOOL hot_on_jit = recomp && [[self valueFor:@"hot_on_jit"] boolValue];
-    if (hot_on_jit) setenv("BB_RECOMP_OFF", "0x21b89a0,0x21b8710", 1);
-    else unsetenv("BB_RECOMP_OFF");
-    /* 512 MiB of direct memory past the game's (the runtime's default on the Mac; app_main.c sets
-     * 0 on iOS when unset) for the render resource cache's larger backing. It goes inside the
-     * guest block at 0x7000000000, where ~640 MiB past the pool is unused: a test of whether it
-     * fits with this layout. */
-    if ([[self valueFor:@"bigger_render_cache"] boolValue]) {
-        setenv("BB_DMEM_EXTRA_MB", "512", 1);
-        printf("iOS app: 512 MiB extra direct memory for the render resource cache\n");
-    } else unsetenv("BB_DMEM_EXTRA_MB");
-    /* The main thread's semaphore waits (about 10,000 per 10 s at 0.02-0.07 ms in Central Yharnam)
-     * spin up to 40 us before sleeping (runtime BB_SEMA_SPIN_US). */
-    if ([[self valueFor:@"sema_spin"] boolValue]) {
-        setenv("BB_SEMA_SPIN_US", "40", 1);
-        printf("iOS app: main thread spins up to 40 us before sleeping on a semaphore\n");
-    } else unsetenv("BB_SEMA_SPIN_US");
-    /* The profile switch also turns on the runtime's record of who wakes the main thread. */
-    if ([[self valueFor:@"BB_IOS_PROFILE"] boolValue]) setenv("BB_WAKE_STATS", "1", 1);
-    else unsetenv("BB_WAKE_STATS");
-    if (hot_on_jit) printf("iOS app: the main thread's two busiest functions on the JIT (BB_RECOMP_OFF)\n");
-    printf("iOS app: recompiled game code %s%s%s\n", !recomp ? "off (JIT only)" : "on",
-           recomp && on_jit ? "; on the JIT: threads named " : "", recomp && on_jit ? on_jit : "");
+    /* The recompiled library (private build) on every thread but the physics ones (Havok), which
+     * run on the JIT: in Central Yharnam 38-46 FPS against 19-24 with physics recompiled, where the
+     * Havok threads woke and slept over and over. Without the library the variable does nothing.
+     * The test switches of 2026-11-06 (render cache, short spin, hot functions, profile) are gone;
+     * their variables are cleared in case an older session left them. */
+    static const char *const cleared[] = {"BB_RECOMP_THREADS", "BB_RECOMP_OFF", "BB_SEMA_SPIN_US", "BB_DMEM_EXTRA_MB",
+                                          "BB_WAKE_STATS", "BB_IOS_PROFILE", "BB_IOS_PROFILE_THREAD"};
+    for (size_t i = 0; i < sizeof(cleared) / sizeof(cleared[0]); ++i) unsetenv(cleared[i]);
+    setenv("BB_RECOMP_NOT_THREADS", "Havok", 1);
+    printf("iOS app: recompiled game code on every thread but physics (Havok)\n");
     /* The guest memory pool imported in windows, so no binding reaches past 4 GiB in one buffer:
      * the runtime's fix for stretched geometry ("vertex explosions", its docs/STABILITY.md), off on
      * iOS only because the windows' overlap is memory a 3.3 GB app could not spare. */
@@ -292,8 +239,6 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     /* What bloodborne-launcher set besides (game_environment): its in-game menu in English,
      * trophy notifications on. */
     setenv("BB_UI_LANGUAGE", "en", 0);
-    /* The performance bar reads the battery's charge (UIDevice): monitoring on, on the main thread. */
-    UIDevice.currentDevice.batteryMonitoringEnabled = YES;
     setenv("BB_TROPHY_OVERLAY", "1", 0);
 }
 

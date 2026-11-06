@@ -36,6 +36,8 @@
 	</array>
 	<key>GCSupportsGameMode</key>
 	<true/>
+	<key>LSSupportsGameMode</key>
+	<true/>
 	<key>GCSupportsControllerUserInteraction</key>
 	<true/>
 	<key>LSApplicationCategoryType</key>
