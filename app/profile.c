@@ -45,8 +45,10 @@ static void thread_name(thread_act_t thread, char *out, size_t size) {
     if (!out[0]) snprintf(out, size, "unnamed");
 }
 
-/* The thread (not this one) with the most CPU time over half a second, and its share of a core. */
+/* The thread (not this one) with the most CPU time over half a second, and its share of a core;
+ * with BB_IOS_PROFILE_THREAD=TEXT only threads whose name contains TEXT (e.g. Havok). */
 static thread_act_t busiest(double *share) {
+    const char *only = getenv("BB_IOS_PROFILE_THREAD");
     thread_act_array_t threads;
     mach_msg_type_number_t count;
     if (task_threads(mach_task_self(), &threads, &count) != KERN_SUCCESS) return MACH_PORT_NULL;
@@ -58,7 +60,13 @@ static thread_act_t busiest(double *share) {
     uint64_t best_us = 0;
     for (mach_msg_type_number_t i = 0; i < count && before; ++i) {
         const uint64_t now = cpu_us(threads[i]), used = now > before[i] ? now - before[i] : 0;
-        if (threads[i] != self && used > best_us) best_us = used, best = threads[i];
+        if (threads[i] == self || used <= best_us) continue;
+        if (only && *only) {
+            char name[64];
+            thread_name(threads[i], name, sizeof(name));
+            if (!strstr(name, only)) continue;
+        }
+        best_us = used, best = threads[i];
     }
     mach_port_deallocate(mach_task_self(), self);
     for (mach_msg_type_number_t i = 0; i < count; ++i)

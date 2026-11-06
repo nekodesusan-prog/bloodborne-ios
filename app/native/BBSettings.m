@@ -124,6 +124,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @"Test: 512 MB of extra game memory for the game's render resource cache (160 MB otherwise), as on the Mac. If the game does not start, turn it off.", NO),
             Switch(@"hot_on_jit", BBStoreApp, @"Main thread's two busiest functions on the JIT",
                    @"Test: the two game functions the profile finds busiest on the main thread run through the JIT instead of the recompiled code.", NO),
+            Choice(@"BB_IOS_PROFILE_THREAD", BBStoreEnv, @"Profile which thread", @"With the profile on: the busiest thread, or the busiest physics (Havok) thread.",
+                   @[@"", @"Havok"], @[@"Busiest", @"Physics (Havok)"], @""),
             Switch(@"BB_IOS_PROFILE", BBStoreEnv, @"Busiest thread profile",
                    @"Every 20 s the log names where the busiest thread spends its time, and every 10 s which threads the main thread waited for. Costs a little speed.", NO),
             Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Metal performance HUD", @"Apple's overlay: frame time, GPU time, memory.", NO),
