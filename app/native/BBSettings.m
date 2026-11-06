@@ -101,6 +101,13 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @"Auto shows them while no controller is connected.",
                    @[@"", @"1", @"0"], @[@"Auto", @"Always", @"Never"], @""),
         ]),
+        Section(@"Testing", @"For measuring only: the defaults are the best settings for playing.", @[
+            Choice(@"recomp_mode", BBStoreApp, @"Recompiled game code",
+                   @"All but physics is the fastest: the physics threads (Havok) run on the JIT.",
+                   @[@"not-physics", @"all"], @[@"All but physics", @"On (physics recompiled too)"], @"not-physics"),
+            Switch(@"physics_wait_log", BBStoreApp, @"Physics wait log",
+                   @"Every 10 s the log lists how often the physics threads sleep and wake, and which threads wake them.", NO),
+        ]),
         Section(@"Performance",
                 @"Built-in JIT needs your pairing file in this app's folder (Files › Bloodborne, any name) and LocalDevVPN on. Without JIT the game's code is interpreted: far too slow to play.", @[
             Switch(@"BB_IOS_JIT", BBStoreEnv, @"Built-in JIT", @"Enabled through StikJIT when you press Play.", YES),
@@ -230,8 +237,16 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     static const char *const cleared[] = {"BB_RECOMP_THREADS", "BB_RECOMP_OFF", "BB_SEMA_SPIN_US", "BB_DMEM_EXTRA_MB",
                                           "BB_WAKE_STATS", "BB_IOS_PROFILE", "BB_IOS_PROFILE_THREAD"};
     for (size_t i = 0; i < sizeof(cleared) / sizeof(cleared[0]); ++i) unsetenv(cleared[i]);
-    setenv("BB_RECOMP_NOT_THREADS", "Havok", 1);
-    printf("iOS app: recompiled game code on every thread but physics (Havok)\n");
+    const BOOL physics_recompiled = [[self valueFor:@"recomp_mode"] isEqualToString:@"all"];
+    if (physics_recompiled) unsetenv("BB_RECOMP_NOT_THREADS");
+    else setenv("BB_RECOMP_NOT_THREADS", "Havok", 1);
+    printf("iOS app: recompiled game code on %s\n", physics_recompiled ? "every thread (physics too)" : "every thread but physics (Havok)");
+    /* The runtime's wake log, following the physics threads (BB_WAKE_THREAD=Havok). */
+    if ([[self valueFor:@"physics_wait_log"] boolValue]) {
+        setenv("BB_WAKE_STATS", "1", 1);
+        setenv("BB_WAKE_THREAD", "Havok", 1);
+        printf("iOS app: physics wait log on\n");
+    } else unsetenv("BB_WAKE_THREAD");
     /* The guest memory pool imported in windows, so no binding reaches past 4 GiB in one buffer:
      * the runtime's fix for stretched geometry ("vertex explosions", its docs/STABILITY.md), off on
      * iOS only because the windows' overlap is memory a 3.3 GB app could not spare. */
