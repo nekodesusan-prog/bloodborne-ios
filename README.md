@@ -91,8 +91,11 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ## An IPA without a Mac (this fork)
 
 `.github/workflows/ipa.yml` builds the launcher's app with the game inside on a GitHub macOS
-runner (`scripts/build-ipa.sh`): Actions › iOS app (IPA) › Run workflow, then download the
-`Bloodborne-ipa` artifact. It holds no game files and no recompiled library; the runtime's
+runner (`scripts/build-ipa.sh`): Actions › iOS app (IPA) › Run workflow. The IPA is published
+as a plain file on the fork's `ios-test` pre-release
+(`releases/download/ios-test/Bloodborne.ipa`, `scripts/publish-ipa.sh`); the `Bloodborne-ipa`
+artifact has the same file in a zip. Publish IPA (`.github/workflows/publish-ipa.yml`) publishes
+an earlier run's artifact without building again. It holds no game files and no recompiled library; the runtime's
 `bbcpu/` is taken from the fork's `ios-jit` branch, where the translator runs once JIT is enabled
 (without JIT the game's code is interpreted, which is far too slow to play).
 

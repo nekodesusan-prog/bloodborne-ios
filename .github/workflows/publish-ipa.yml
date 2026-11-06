@@ -1,0 +1,30 @@
+# Publishes the IPA an earlier "iOS app (IPA)" run built as a plain file on the ios-test
+# pre-release, without building it again. Actions › Publish IPA › Run workflow, with the run's ID.
+name: Publish IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: ID of the "iOS app (IPA)" run whose Bloodborne-ipa artifact to publish
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.run_id }}" -n Bloodborne-ipa -D out
+          ls -l out
+      - name: Publish on the ios-test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/publish-ipa.sh out/Bloodborne.ipa "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ inputs.run_id }}"
