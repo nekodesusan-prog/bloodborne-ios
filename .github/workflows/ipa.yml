@@ -51,8 +51,11 @@ jobs:
         with:
           node-version: 22
 
+      # Restored here and saved right after the dependencies are built, so a later failing step
+      # does not throw the hour of dependencies away.
       - name: Dependency cache
-        uses: actions/cache@v4
+        id: deps
+        uses: actions/cache/restore@v4
         with:
           path: |
             runtime/deps/build
@@ -68,6 +71,18 @@ jobs:
         run: |
           bash runtime/scripts/macos/build-deps.sh
           bash runtime/scripts/ios/build-deps.sh
+
+      - name: Save dependency cache
+        if: steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            runtime/deps/build
+            runtime/deps/macos-arm64
+            runtime/deps/ios-arm64
+            runtime/deps/build-ios
+            runtime/build/deps-arm64
+          key: ${{ steps.deps.outputs.cache-primary-key }}
 
       - name: StikJIT cache
         uses: actions/cache@v4
