@@ -121,7 +121,7 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
             Switch(@"hot_on_jit", BBStoreApp, @"Main thread's two busiest functions on the JIT",
                    @"Test: the two game functions the profile finds busiest on the main thread run through the JIT instead of the recompiled code.", NO),
             Switch(@"BB_IOS_PROFILE", BBStoreEnv, @"Busiest thread profile",
-                   @"Every 20 s the log names where the busiest thread spends its time. Costs a little speed.", NO),
+                   @"Every 20 s the log names where the busiest thread spends its time, and every 10 s which threads the main thread waited for. Costs a little speed.", NO),
             Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Metal performance HUD", @"Apple's overlay: frame time, GPU time, memory.", NO),
             Switch(@"BB_FRAME_STATS", BBStoreEnv, @"Performance lines in the log",
                    @"Frame statistics in bb-ios.log every few seconds, for reports.", YES),
@@ -259,6 +259,9 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     const BOOL hot_on_jit = recomp && [[self valueFor:@"hot_on_jit"] boolValue];
     if (hot_on_jit) setenv("BB_RECOMP_OFF", "0x21b89a0,0x21b8710", 1);
     else unsetenv("BB_RECOMP_OFF");
+    /* The profile switch also turns on the runtime's record of who wakes the main thread. */
+    if ([[self valueFor:@"BB_IOS_PROFILE"] boolValue]) setenv("BB_WAKE_STATS", "1", 1);
+    else unsetenv("BB_WAKE_STATS");
     if (hot_on_jit) printf("iOS app: the main thread's two busiest functions on the JIT (BB_RECOMP_OFF)\n");
     printf("iOS app: recompiled game code %s%s%s\n", !recomp ? "off (JIT only)" : "on",
            recomp && on_jit ? "; on the JIT: threads named " : "", recomp && on_jit ? on_jit : "");
