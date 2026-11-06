@@ -40,7 +40,7 @@ rm -rf "$app/Frameworks/StikJIT.framework"
 cp -R "$framework" "$app/Frameworks/"
 appex=$app/PlugIns/BloodborneJITHelper.appex
 rm -rf "$appex" && mkdir -p "$appex"
-xcrun -sdk iphoneos swiftc -target arm64-apple-ios26.0 -O -parse-as-library -application-extension \
+xcrun -sdk iphoneos swiftc -target arm64-apple-ios26.0 -swift-version 5 -O -parse-as-library -application-extension \
     -module-name BloodborneJITHelper -F "$(dirname "$framework")" -framework StikJIT \
     -Xlinker -e -Xlinker _NSExtensionMain -Xlinker -rpath -Xlinker @executable_path/../../Frameworks \
     app/JITHelper/JITHelper.swift -o "$appex/BloodborneJITHelper"

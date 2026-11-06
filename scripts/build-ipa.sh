@@ -73,10 +73,15 @@ cat > "$out/entitlements.plist" <<'EOF'
 </dict>
 </plist>
 EOF
-# Inside out: the framework, the helper, then the app.
-codesign --force --sign - --timestamp=none "$app/Frameworks/StikJIT.framework"
-codesign --force --sign - --timestamp=none "$app/PlugIns/BloodborneJITHelper.appex"
+# Inside out: every framework and library (Xcode signed nothing), the helper, then the app.
+shopt -s nullglob
+for code in "$app"/Frameworks/*.framework "$app"/Frameworks/*.dylib "$app"/PlugIns/*.appex; do
+    codesign --force --sign - --timestamp=none "$code"
+done
+shopt -u nullglob
 codesign --force --sign - --entitlements "$out/entitlements.plist" --timestamp=none "$app"
+codesign --verify --deep --strict "$app"
+ls -la "$app/Frameworks" "$app/PlugIns"
 rm -rf "$out/Payload" "$out/../Bloodborne.ipa"
 mkdir -p "$out/Payload"
 cp -R "$app" "$out/Payload/"
