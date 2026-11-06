@@ -106,6 +106,10 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
             Choice(@"recomp_mode", BBStoreApp, @"Recompiled game code",
                    @"All but physics is the fastest: the physics threads (Havok) run on the JIT.",
                    @[@"not-physics", @"all"], @[@"All but physics", @"On (physics recompiled too)"], @"not-physics"),
+            Choice(@"profile", BBStoreApp, @"Thread profile",
+                   @"Every 20 s the log names where the chosen threads spend their time. Costs a little speed.",
+                   @[@"off", @"main", @"render", @"physics"],
+                   @[@"Off", @"Main thread", @"Render threads (ours)", @"Physics threads"], @"off"),
             Switch(@"physics_wait_log", BBStoreApp, @"Physics wait log",
                    @"Every 10 s the log lists how often the physics threads sleep and wake, and which threads wake them.", NO),
         ]),
@@ -257,6 +261,16 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         setenv("BB_EFFICIENCY_THREADS", "FMOD,Core.Res,NexusRevolution,CSTrophy,Core.Logging,DLUserPreference,SLSession,FrpgSaveLoadMan,FaceGenMan", 1);
         printf("iOS app: background game threads on the efficiency cores\n");
     } else unsetenv("BB_EFFICIENCY_THREADS");
+    /* The in-app profile (app/profile.c): the busiest thread of the chosen group every 20 s. The
+     * render threads are the runtime's (DrawRec, the GPU command processor, the Vulkan recorders):
+     * 60-75% of a core together in Central Yharnam. */
+    NSString *profile = [self valueFor:@"profile"];
+    if (![profile isEqualToString:@"off"]) {
+        setenv("BB_IOS_PROFILE", "1", 1);
+        if ([profile isEqualToString:@"render"]) setenv("BB_IOS_PROFILE_THREAD", "DrawRec,GpuCommandProcessor,VkRecorder", 1);
+        else if ([profile isEqualToString:@"physics"]) setenv("BB_IOS_PROFILE_THREAD", "Havok", 1);
+        /* "main": no filter, the busiest thread (the game's main thread has no host name) */
+    }
     /* The runtime's wake log, following the physics threads (BB_WAKE_THREAD=Havok). */
     if ([[self valueFor:@"physics_wait_log"] boolValue]) {
         setenv("BB_WAKE_STATS", "1", 1);

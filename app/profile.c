@@ -46,7 +46,7 @@ static void thread_name(thread_act_t thread, char *out, size_t size) {
 }
 
 /* The thread (not this one) with the most CPU time over half a second, and its share of a core;
- * with BB_IOS_PROFILE_THREAD=TEXT only threads whose name contains TEXT (e.g. Havok). */
+ * with BB_IOS_PROFILE_THREAD=TEXT,... only threads whose name contains one of them (e.g. Havok). */
 static thread_act_t busiest(double *share) {
     const char *only = getenv("BB_IOS_PROFILE_THREAD");
     thread_act_array_t threads;
@@ -61,10 +61,14 @@ static thread_act_t busiest(double *share) {
     for (mach_msg_type_number_t i = 0; i < count && before; ++i) {
         const uint64_t now = cpu_us(threads[i]), used = now > before[i] ? now - before[i] : 0;
         if (threads[i] == self || used <= best_us) continue;
-        if (only && *only) {
-            char name[64];
+        if (only && *only) { /* a comma-separated list of name parts */
+            char name[64], list[256];
             thread_name(threads[i], name, sizeof(name));
-            if (!strstr(name, only)) continue;
+            snprintf(list, sizeof(list), "%s", only);
+            int match = 0;
+            for (char *save = NULL, *part = strtok_r(list, ",", &save); part && !match; part = strtok_r(NULL, ",", &save))
+                match = *part && strstr(name, part) != NULL;
+            if (!match) continue;
         }
         best_us = used, best = threads[i];
     }
