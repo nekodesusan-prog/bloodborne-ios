@@ -25,6 +25,15 @@ jobs:
           addr=$(( base + off ))
           printf 'TEXT vmaddr %s, address 0x%x\n' "$base" "$addr"
           echo "== symbols before it"
-          nm -n "$exe" | awk -v a=$addr '{v=strtonum("0x"$1); if (v<=a) last=$0; else {print last; print $0; exit}}'
+          nm -n "$exe" | python3 -c "
+          import sys
+          a=$addr; last=None
+          for line in sys.stdin:
+              parts=line.split()
+              if len(parts)<3: continue
+              v=int(parts[0],16)
+              if v<=a: last=line.rstrip()
+              else: print(last); print(line.rstrip()); break
+          "
           echo "== disassembly"
           xcrun objdump -d --no-show-raw-insn --start-address=$(( addr - 0x140 )) --stop-address=$(( addr + 0x40 )) "$exe" | tail -100
