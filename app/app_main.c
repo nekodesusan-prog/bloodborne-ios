@@ -465,7 +465,9 @@ static void ios_output(const char *config, char *render, size_t render_size, cha
     else if (!strcmp(aspect, "16:10")) ratio = 16.0 / 10.0;
     else if (!strcmp(aspect, "21:9")) ratio = 64.0 / 27.0;
     else if (!strcmp(aspect, "32:9")) ratio = 32.0 / 9.0;
-    const int height = chosen_height >= 360 && chosen_height <= 540 ? chosen_height : 540;
+    /* Up to 1080 lines (the native app's Resolution menu): above 540 is for devices with the
+     * increased memory limit; no scene is larger than 1080p, so direct memory stays as it is. */
+    const int height = chosen_height >= 360 && chosen_height <= 1080 ? chosen_height : 540;
     const int width = (int)(height * ratio / 2.0 + 0.5) * 2;
     snprintf(render, render_size, "%dx%d", width, height);
     /* The runtime's presets (gpu/shim/bbport_settings.cpp PresetScale); TAA and off: no scaling. */

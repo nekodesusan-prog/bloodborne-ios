@@ -194,7 +194,7 @@ static NSString *PairingFile(NSString *documents) {
         cell.accessoryView = toggle;
         return cell;
     }
-    NSMutableArray<UIMenuElement *> *items = [NSMutableArray array];
+    NSMutableArray<UIMenuElement *> *actions = [NSMutableArray array];
     for (NSUInteger i = 0; i < s.values.count; ++i) {
         NSString *choice = s.values[i];
         UIAction *action = [UIAction actionWithTitle:s.labels[i] image:nil identifier:nil handler:^(UIAction *a) {
@@ -202,7 +202,20 @@ static NSString *PairingFile(NSString *documents) {
             [self reload];
         }];
         action.state = [choice isEqualToString:value] ? UIMenuElementStateOn : UIMenuElementStateOff;
-        [items addObject:action];
+        [actions addObject:action];
+    }
+    /* Grouped menus (Resolution): a titled inline section per group, as Madeira's. */
+    NSMutableArray<UIMenuElement *> *items = actions;
+    if (s.groups) {
+        items = [NSMutableArray array];
+        NSUInteger at = 0;
+        for (NSArray *group in s.groups) {
+            const NSUInteger count = MIN([group[1] unsignedIntegerValue], actions.count - at);
+            [items addObject:[UIMenu menuWithTitle:group[0] image:nil identifier:nil
+                                           options:UIMenuOptionsDisplayInline
+                                          children:[actions subarrayWithRange:NSMakeRange(at, count)]]];
+            at += count;
+        }
     }
     UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
     config.title = [s labelFor:value];

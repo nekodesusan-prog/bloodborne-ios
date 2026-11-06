@@ -19,6 +19,8 @@ typedef NS_ENUM(NSInteger, BBStore) {
 @property(nonatomic, copy) NSArray<NSString *> *labels;
 @property(nonatomic, copy) NSString *defaultValue;
 @property(nonatomic, copy) NSString *parent;       /* shown only while this switch is on */
+/* Menu sections: each {title, number of values}, in order; nil: one plain list. */
+@property(nonatomic, copy) NSArray<NSArray *> *groups;
 @property(nonatomic, readonly) BOOL isSwitch;
 - (NSString *)labelFor:(NSString *)value;
 @end

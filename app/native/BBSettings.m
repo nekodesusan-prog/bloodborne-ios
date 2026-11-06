@@ -3,6 +3,8 @@
  * 720x540, built-in JIT). Keys and values are the runtime's and bloodborne-launcher's
  * (src/lib/data/options.ts, src-tauri/src/lib.rs game_environment). */
 #import "BBSettings.h"
+#import <UIKit/UIKit.h>
+#include <os/proc.h>
 #include <stdlib.h>
 
 static NSString *const BBPrefix = @"setting.";
@@ -74,12 +76,7 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @[@"off", @"1", @"2", @"3", @"4"],
                    @[@"Off", @"MetalFX ×1.5 (Quality)", @"MetalFX ×1.7 (Balanced)", @"MetalFX ×2 (Performance)",
                      @"MetalFX ×3 (Ultra Performance)"], @"off"),
-            Choice(@"render_height", BBStoreApp, @"Render resolution",
-                   @"The size the game draws at, in the screen's shape. 540 lines at most: a larger picture does not fit in what iOS gives an app.",
-                   @[@"540", @"480", @"432", @"360"], @[@"540 lines", @"480 lines", @"432 lines", @"360 lines (lightest)"], @"540"),
-            Choice(@"aspect_ratio", BBStoreIni, @"Aspect ratio",
-                   @"Auto fills this screen. 16:9 shows the game as on a TV, with bars.",
-                   @[@"auto", @"4:3", @"16:10", @"16:9", @"21:9"], @[@"Auto (this screen)", @"4:3", @"16:10", @"16:9", @"21:9"], @"auto"),
+            [self resolutionSetting],
             Choice(@"BB_LANGUAGE", BBStoreEnv, @"Game language", nil,
                    @[@"1", @"18", @"17", @"7", @"3", @"20", @"2", @"4", @"5", @"6", @"16", @"8", @"19", @"12", @"13", @"14", @"15", @"0", @"9", @"11", @"10"],
                    @[@"English (US)", @"English (UK)", @"Português (Brasil)", @"Português (Portugal)", @"Español (España)",
@@ -119,6 +116,38 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         for (BBSetting *s in section.settings) byKey[s.key] = s;
     _byKey = byKey;
     return self;
+}
+
+/* Resolution, as Madeira's: the size the game draws at, by shape. Values are "aspect:height"
+ * (bbport.ini aspect_ratio and output_res; app_main.c ios_output takes the width from the shape).
+ * MetalFX scales the result up. Above 540 lines needs the increased memory limit. */
+- (BBSetting *)resolutionSetting {
+    CGSize native = UIScreen.mainScreen.nativeBounds.size;
+    const double ratio = MAX(native.width, native.height) / MAX(1.0, MIN(native.width, native.height));
+    NSMutableArray *values = [NSMutableArray array], *labels = [NSMutableArray array], *groups = [NSMutableArray array];
+    void (^add)(NSString *, double, NSArray *, NSDictionary *) = ^(NSString *aspect, double r, NSArray *heights, NSDictionary *notes) {
+        for (NSNumber *h in heights) {
+            const int height = h.intValue, width = (int)(height * r / 2.0 + 0.5) * 2;
+            NSString *note = notes[h];
+            [values addObject:[NSString stringWithFormat:@"%@:%d", aspect, height]];
+            [labels addObject:note ? [NSString stringWithFormat:@"%d×%d · %@", width, height, note]
+                                   : [NSString stringWithFormat:@"%d×%d", width, height]];
+        }
+    };
+    add(@"auto", ratio, @[@480, @540, @648, @720, @810, @1080],
+        @{@480: @"light", @540: @"default", @810: @"heavier", @1080: @"≈1080p, heaviest"});
+    [groups addObject:@[@"This screen's shape", @6]];
+    add(@"16:9", 16.0 / 9.0, @[@540, @720, @900, @1080], @{@1080: @"1080p"});
+    [groups addObject:@[@"16:9 widescreen · bars", @4]];
+    if (fabs(ratio - 4.0 / 3.0) > 0.05) {
+        add(@"4:3", 4.0 / 3.0, @[@480, @600, @720], @{});
+        [groups addObject:@[@"4:3 classic · bars", @3]];
+    }
+    BBSetting *s = Choice(@"resolution", BBStoreApp, @"Resolution",
+        @"The size the game draws at. Larger is sharper and heavier; above 540 lines needs the increased memory limit (GetMoreRam). MetalFX scales it up.",
+        values, labels, @"auto:540");
+    s.groups = groups;
+    return s;
 }
 
 - (NSString *)valueFor:(NSString *)key {
@@ -182,10 +211,17 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     NSString *upscale = [self valueFor:@"upscale"];
     ini[@"upscaler"] = [upscale isEqualToString:@"off"] ? @"off" : @"metalfx";
     if (![upscale isEqualToString:@"off"]) ini[@"preset"] = upscale;
-    /* The render height (app_main.c ios_output takes the width from the screen's shape). */
-    ini[@"output_res"] = [NSString stringWithFormat:@"%dx%@", [self valueFor:@"render_height"].intValue * 4 / 3,
-                          [self valueFor:@"render_height"]];
+    /* Resolution: the shape and the height (app_main.c ios_output takes the width from the shape). */
+    NSArray<NSString *> *resolution = [[self valueFor:@"resolution"] componentsSeparatedByString:@":"];
+    NSString *aspect = resolution.count == 2 ? resolution[0] : @"auto";
+    const int height = resolution.count == 2 ? resolution[1].intValue : 540;
+    ini[@"aspect_ratio"] = aspect;
+    ini[@"output_res"] = [NSString stringWithFormat:@"%dx%d", height * 4 / 3, height];
     [self writeIni:ini];
+    /* The guest memory pool imported in windows, so no binding reaches past 4 GiB in one buffer:
+     * the runtime's fix for stretched geometry ("vertex explosions", its docs/STABILITY.md), off on
+     * iOS only because the windows' overlap is memory a 3.3 GB app could not spare. */
+    if (os_proc_available_memory() >= (8ull << 30)) setenv("BB_POOL_SPLIT", "1", 1);
     /* What bloodborne-launcher set besides (game_environment): its in-game menu in English,
      * trophy notifications on. */
     setenv("BB_UI_LANGUAGE", "en", 0);
