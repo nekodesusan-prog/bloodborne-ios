@@ -118,6 +118,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @[@"all", @"not-physics", @"not-physics-cloth", @"not-physics-cloth-chr", @"off"],
                    @[@"On", @"All but physics", @"All but physics and cloth", @"All but physics, cloth, characters", @"Off (JIT only)"],
                    @"not-physics"),
+            Switch(@"hot_on_jit", BBStoreApp, @"Main thread's two busiest functions on the JIT",
+                   @"Test: the two game functions the profile finds busiest on the main thread run through the JIT instead of the recompiled code.", NO),
             Switch(@"BB_IOS_PROFILE", BBStoreEnv, @"Busiest thread profile",
                    @"Every 20 s the log names where the busiest thread spends its time. Costs a little speed.", NO),
             Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Metal performance HUD", @"Apple's overlay: frame time, GPU time, memory.", NO),
@@ -251,6 +253,13 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     else setenv("BB_RECOMP_LIB", "", 1);
     /* bbcpu (ios-jit 18b8b36 on) runs the filtered threads' calls translated in the same loop. */
     if (recomp && on_jit) setenv("BB_RECOMP_NOT_THREADS", on_jit, 1);
+    /* The main thread's two busiest recompiled functions in the in-app profile (Central Yharnam:
+     * 11-17% and 6-10% of its samples), by guest offset in the 1.09 executable, left to the JIT
+     * (bbcpu's BB_RECOMP_OFF), to see whether the JIT runs them faster as it does physics. */
+    const BOOL hot_on_jit = recomp && [[self valueFor:@"hot_on_jit"] boolValue];
+    if (hot_on_jit) setenv("BB_RECOMP_OFF", "0x21b89a0,0x21b8710", 1);
+    else unsetenv("BB_RECOMP_OFF");
+    if (hot_on_jit) printf("iOS app: the main thread's two busiest functions on the JIT (BB_RECOMP_OFF)\n");
     printf("iOS app: recompiled game code %s%s%s\n", !recomp ? "off (JIT only)" : "on",
            recomp && on_jit ? "; on the JIT: threads named " : "", recomp && on_jit ? on_jit : "");
     /* The guest memory pool imported in windows, so no binding reaches past 4 GiB in one buffer:
