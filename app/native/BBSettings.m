@@ -5,6 +5,7 @@
 #import "BBSettings.h"
 #import <UIKit/UIKit.h>
 #include <os/proc.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 static NSString *const BBPrefix = @"setting.";
@@ -108,6 +109,9 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         Section(@"Performance",
                 @"Built-in JIT needs your pairing file in this app's folder (Files › Bloodborne, any name) and LocalDevVPN on. Without JIT the game's code is interpreted: far too slow to play.", @[
             Switch(@"BB_IOS_JIT", BBStoreEnv, @"Built-in JIT", @"Enabled through StikJIT when you press Play.", YES),
+            Choice(@"recomp_threads", BBStoreApp, @"Recompiled game code",
+                   @"Only in the private build that carries the recompiled library. To compare with the JIT in the same place: physics on the JIT, or no recompiled code at all.",
+                   @[@"all", @"not-physics", @"off"], @[@"Every thread", @"All but physics (Havok)", @"Off (JIT only)"], @"all"),
             Switch(@"MTL_HUD_ENABLED", BBStoreEnv, @"Metal performance HUD", @"Apple's overlay: frame time, GPU time, memory.", NO),
             Switch(@"BB_FRAME_STATS", BBStoreEnv, @"Performance lines in the log",
                    @"Frame statistics in bb-ios.log every few seconds, for reports.", YES),
@@ -225,6 +229,14 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     ini[@"aspect_ratio"] = aspect;
     ini[@"output_res"] = [NSString stringWithFormat:@"%dx%d", height * 4 / 3, height];
     [self writeIni:ini];
+    /* Which threads run the recompiled library's functions (bbcpu's BB_RECOMP_THREADS and
+     * BB_RECOMP_NOT_THREADS: parts of the host thread names; the rest go through the JIT). */
+    NSString *recomp = [self valueFor:@"recomp_threads"];
+    unsetenv("BB_RECOMP_THREADS"), unsetenv("BB_RECOMP_NOT_THREADS");
+    if ([recomp isEqualToString:@"not-physics"]) setenv("BB_RECOMP_NOT_THREADS", "Havok", 1);
+    else if ([recomp isEqualToString:@"off"]) setenv("BB_RECOMP_THREADS", "#no-thread#", 1);
+    printf("iOS app: recompiled game code on %s\n", [recomp isEqualToString:@"not-physics"] ? "every thread but Havok's (physics on the JIT)"
+                                                    : [recomp isEqualToString:@"off"] ? "no thread (JIT only)" : "every thread");
     /* The guest memory pool imported in windows, so no binding reaches past 4 GiB in one buffer:
      * the runtime's fix for stretched geometry ("vertex explosions", its docs/STABILITY.md), off on
      * iOS only because the windows' overlap is memory a 3.3 GB app could not spare. */
