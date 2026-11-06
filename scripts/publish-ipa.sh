@@ -22,3 +22,15 @@ else
 fi
 gh release upload "$tag" "$ipa#Bloodborne.ipa" --clobber
 echo "https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/Bloodborne.ipa ($size bytes)"
+# Downloaded back from the public link, as a player would: the same bytes and a zip that opens.
+url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/Bloodborne.ipa"
+check=$(mktemp)
+for attempt in 1 2 3 4 5 6; do
+    curl -fsSL -o "$check" "$url" && [[ $(shasum -a 256 "$check" | cut -d' ' -f1) == "$sum" ]] && break
+    sleep 10
+done
+[[ $(shasum -a 256 "$check" | cut -d' ' -f1) == "$sum" ]] ||
+    { echo "publish-ipa.sh: the published IPA does not download as uploaded" >&2; exit 1; }
+unzip -tq "$check"
+echo "Downloaded back: $(wc -c < "$check") bytes, SHA-256 matches, the zip tests OK"
+rm -f "$check"
