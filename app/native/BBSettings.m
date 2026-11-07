@@ -118,6 +118,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
             Switch(@"BB_IOS_JIT", BBStoreEnv, @"Built-in JIT", @"Enabled through StikJIT when you press Play.", YES),
             Switch(@"efficiency_threads", BBStoreApp, @"Background threads on efficiency cores",
                    @"Audio mixing, file loading, network and saving run on the iPad's low-power cores: less heat. If sound crackles or loading gets slow, turn it off.", NO),
+            Switch(@"precompile_shaders", BBStoreApp, @"Pre-compile shaders",
+                   @"At the next Play, the game's shaders are built before the title screen (several minutes, once; a progress bar shows it). Then new areas and effects no longer hitch the first time. It is not repeated once done.", NO),
             Switch(@"BB_FRAME_STATS", BBStoreEnv, @"Performance lines in the log",
                    @"Frame statistics in bb-ios.log every few seconds, for reports.", YES),
         ]),
@@ -150,8 +152,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
     add(@"auto", ratio, @[@480, @540, @648, @720, @810, @1080],
         @{@480: @"light", @540: @"default", @810: @"heavier", @1080: @"≈1080p, heaviest"});
     [groups addObject:@[@"This screen's shape", @6]];
-    add(@"16:9", 16.0 / 9.0, @[@540, @720, @900, @1080], @{@1080: @"1080p"});
-    [groups addObject:@[@"16:9 widescreen · bars", @4]];
+    add(@"16:9", 16.0 / 9.0, @[@480, @540, @720, @900, @1080], @{@480: @"lightest", @1080: @"1080p"});
+    [groups addObject:@[@"16:9 widescreen · bars", @5]];
     if (fabs(ratio - 4.0 / 3.0) > 0.05) {
         add(@"4:3", 4.0 / 3.0, @[@480, @600, @720], @{});
         [groups addObject:@[@"4:3 classic · bars", @3]];
@@ -261,6 +263,15 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         setenv("BB_EFFICIENCY_THREADS", "FMOD,Core.Res,NexusRevolution,CSTrophy,Core.Logging,DLUserPreference,SLSession,FrpgSaveLoadMan,FaceGenMan", 1);
         printf("iOS app: background game threads on the efficiency cores\n");
     } else unsetenv("BB_EFFICIENCY_THREADS");
+    /* The runtime's ahead-of-time shader step (BB_SHADER_COMPILE, docs/NATIVE_RENDERER.md): every
+     * program read from the game's files is translated and compiled before play, with a progress
+     * bar, and recorded so that it is not repeated. BB_GAME_DIR is the game folder app_main.c
+     * passes as app0. */
+    if ([[self valueFor:@"precompile_shaders"] boolValue]) {
+        setenv("BB_SHADER_COMPILE", "1", 1);
+        setenv("BB_GAME_DIR", [self.documents stringByAppendingPathComponent:@"game"].fileSystemRepresentation, 1);
+        printf("iOS app: shaders pre-compiled before play (BB_SHADER_COMPILE)\n");
+    } else unsetenv("BB_SHADER_COMPILE");
     /* The in-app profile (app/profile.c): the busiest thread of the chosen group every 20 s. The
      * render threads are the runtime's (DrawRec, the GPU command processor, the Vulkan recorders):
      * 60-75% of a core together in Central Yharnam. */
