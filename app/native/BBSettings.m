@@ -135,10 +135,6 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
  * (bbport.ini aspect_ratio and output_res; app_main.c ios_output takes the width from the shape).
  * MetalFX scales the result up. Above 540 lines needs the increased memory limit. */
 - (BBSetting *)resolutionSetting {
-    CGSize native = CGSizeMake(4, 3);
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
-        if ([scene isKindOfClass:UIWindowScene.class]) native = ((UIWindowScene *)scene).screen.nativeBounds.size;
-    const double ratio = MAX(native.width, native.height) / MAX(1.0, MIN(native.width, native.height));
     NSMutableArray *values = [NSMutableArray array], *labels = [NSMutableArray array], *groups = [NSMutableArray array];
     void (^add)(NSString *, double, NSArray *, NSDictionary *) = ^(NSString *aspect, double r, NSArray *heights, NSDictionary *notes) {
         for (NSNumber *h in heights) {
@@ -149,17 +145,10 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                                    : [NSString stringWithFormat:@"%d×%d", width, height]];
         }
     };
-    add(@"auto", ratio, @[@480, @540, @648, @720, @810, @1080],
-        @{@480: @"light", @540: @"default", @810: @"heavier", @1080: @"≈1080p, heaviest"});
-    [groups addObject:@[@"This screen's shape", @6]];
-    add(@"16:9", 16.0 / 9.0, @[@480, @540, @720, @900, @1080], @{@480: @"lightest", @1080: @"1080p"});
+    add(@"16:9", 16.0 / 9.0, @[@480, @540, @720, @900, @1080], @{@480: @"lightest", @540: @"default", @1080: @"1080p"});
     [groups addObject:@[@"16:9 widescreen · bars", @5]];
-    if (fabs(ratio - 4.0 / 3.0) > 0.05) {
-        add(@"4:3", 4.0 / 3.0, @[@480, @600, @720], @{});
-        [groups addObject:@[@"4:3 classic · bars", @3]];
-    }
     BBSetting *s = Choice(@"resolution", BBStoreApp, @"Resolution",
-        @"The size the game draws at. Larger is sharper and heavier; above 540 lines needs the increased memory limit (GetMoreRam). MetalFX scales it up.",
+        @"The size the game draws at, in 16:9 with black bars (other shapes showed a grey area). Larger is sharper and heavier; above 540 lines needs the increased memory limit (GetMoreRam). MetalFX scales it up.",
         values, labels, @"16:9:540");
     s.groups = groups;
     return s;
