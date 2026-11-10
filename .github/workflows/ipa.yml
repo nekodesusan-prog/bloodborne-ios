@@ -42,7 +42,7 @@ jobs:
       # The runtime first (its submodules at its own pins), then bbcpu over it.
       - name: Runtime from the fork
         run: |
-          git -C runtime fetch --depth 1 "${{ inputs.runtime_repo || 'https://github.com/nekodesusan-prog/bloodborne-runtime.git' }}" "${{ inputs.runtime_ref || 'ios-overlay' }}"
+          git -C runtime fetch --depth 1 "${{ inputs.runtime_repo || 'https://github.com/nekodesusan-prog/bloodborne-runtime.git' }}" "${{ inputs.runtime_ref || 'ios-next' }}"
           git -C runtime checkout --detach FETCH_HEAD
           git -C runtime submodule update --init --recursive --depth 1
           git -C runtime log -1 --format='runtime %h %s'
