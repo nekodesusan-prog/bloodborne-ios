@@ -277,9 +277,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         setenv("BB_WAKE_THREAD", "Havok", 1);
         printf("iOS app: physics wait log on\n");
     } else unsetenv("BB_WAKE_THREAD");
-    /* The guest memory pool as one Metal buffer: the runtime's default for its Metal renderer
-     * since upstream 5e9327f (Metal's 64-bit buffer offsets read past 4 GiB correctly; the windows
-     * were MoltenVK's fix). An older choice of windows is cleared so the overlap's memory is free. */
+    /* The guest memory pool: the runtime's default (upstream 2340067, two overlapping windows, so
+     * no binding offset reaches 4 GiB: one buffer drew a black sky with streaks after some play). */
     unsetenv("BB_POOL_SPLIT");
     /* What bloodborne-launcher set besides (game_environment): its in-game menu in English,
      * trophy notifications on. */
