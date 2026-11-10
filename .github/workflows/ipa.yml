@@ -17,7 +17,7 @@ on:
         description: bloodborne-runtime repository for runtime/
         default: https://github.com/nekodesusan-prog/bloodborne-runtime.git
       runtime_ref:
-        description: runtime branch or commit (ios-next: the latest upstream with our iOS commits on top)
+        description: runtime branch or commit (ios-next = the latest upstream with our iOS commits on top)
         default: ios-next
 
 # contents: write publishes the IPA on the ios-test release.
