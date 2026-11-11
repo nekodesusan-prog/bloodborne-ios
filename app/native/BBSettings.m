@@ -65,6 +65,8 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
                    @[@"60", @"30", @"uncap"], @[@"60 FPS", @"30 FPS (the PS4's, cooler)", @"Unlocked"], @"60"),
             Choice(@"BB_FPS_LIMIT", BBStoreEnv, @"Frame rate limit", nil,
                    @[@"", @"30", @"40", @"45", @"60"], @[@"None", @"30", @"40", @"45", @"60"], @""),
+            Switch(@"framegen", BBStoreApp, @"Frame generation",
+                   @"The game runs at 30 FPS and MetalFX makes a frame between each two: 60 on screen, about half the heat. A little more input lag; the frame rate settings above are ignored.", NO),
             Choice(@"upscale", BBStoreApp, @"Upscaling",
                    @"MetalFX draws the game at the render resolution and scales it up: sharper, at a small GPU cost.",
                    @[@"off", @"1", @"2", @"3", @"4"],
@@ -261,6 +263,15 @@ static BBSettingsSection *Section(NSString *title, NSString *footer, NSArray<BBS
         setenv("BB_GAME_DIR", [self.documents stringByAppendingPathComponent:@"game"].fileSystemRepresentation, 1);
         printf("iOS app: shaders pre-compiled before play (BB_SHADER_COMPILE)\n");
     } else unsetenv("BB_SHADER_COMPILE");
+    /* Frame generation (the runtime's BB_FRAMEGEN, mtl_present.mm): the game at the PS4's 30 FPS,
+     * MetalFX's frame interpolator makes the frame between each two, shown a 60 Hz period before
+     * the game's. It replaces the frame rate and limit chosen above. */
+    if ([[self valueFor:@"framegen"] boolValue]) {
+        setenv("BB_FRAMEGEN", "1", 1);
+        setenv("BB_FPS", "30", 1);
+        unsetenv("BB_FPS_LIMIT");
+        printf("iOS app: frame generation on (the game at 30 FPS, 60 on screen)\n");
+    } else unsetenv("BB_FRAMEGEN");
     /* The in-app profile (app/profile.c): the busiest thread of the chosen group every 20 s. The
      * render threads are the runtime's (DrawRec, the GPU command processor, the Vulkan recorders):
      * 60-75% of a core together in Central Yharnam. */
