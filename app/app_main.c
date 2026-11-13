@@ -199,6 +199,54 @@ __attribute__((constructor(100))) static void measure_free_block(void) {
 }
 
 #ifdef BB_IOS_IN_LAUNCHER
+
+/* The game folder the app reads (Documents/game), its top-level folders with their item counts and
+ * the files the game cannot start without: when a file is missing, which folder is meant. */
+#include <dirent.h>
+static int count_entries(const char *path) {
+    DIR *d = opendir(path);
+    if (!d) return -1;
+    int n = 0;
+    for (struct dirent *e; (e = readdir(d));)
+        if (e->d_name[0] != '.') ++n;
+    closedir(d);
+    return n;
+}
+static void report_game_folder(const char *documents) {
+    char path[1200], line[2048];
+    snprintf(path, sizeof(path), "%s/game/dvdroot_ps4", documents);
+    DIR *d = opendir(path);
+    if (!d) { printf("iOS app: game folder %s cannot be opened (%s)\n", path, strerror(errno)); return; }
+    size_t used = 0;
+    line[0] = 0;
+    for (struct dirent *e; (e = readdir(d));) {
+        if (e->d_name[0] == '.') continue;
+        char sub[1400];
+        snprintf(sub, sizeof(sub), "%s/%s", path, e->d_name);
+        int n = count_entries(sub);
+        if (used < sizeof(line) - 64) used += (size_t)snprintf(line + used, sizeof(line) - used, " %s=%d", e->d_name, n);
+    }
+    closedir(d);
+    printf("iOS app: game folder %s:%s\n", path, line);
+    static const char *const needed[] = {"shader/gxshader.shaderbnd.dcx", "shader/gxgui.shaderbnd.dcx",
+                                         "other/systex.tpf.dcx", "action/eventnameid.txt"};
+    for (size_t i = 0; i < sizeof(needed) / sizeof(*needed); ++i) {
+        char file[1400];
+        snprintf(file, sizeof(file), "%s/%s", path, needed[i]);
+        struct stat st;
+        if (stat(file, &st)) printf("iOS app: MISSING %s (%s)\n", needed[i], strerror(errno));
+        else printf("iOS app: found %s (%lld bytes)\n", needed[i], (long long)st.st_size);
+    }
+    snprintf(path, sizeof(path), "%s/game/dvdroot_ps4/shader", documents);
+    if ((d = opendir(path))) {
+        used = 0; line[0] = 0;
+        for (struct dirent *e; (e = readdir(d));)
+            if (e->d_name[0] != '.' && used < sizeof(line) - 64)
+                used += (size_t)snprintf(line + used, sizeof(line) - used, " %s", e->d_name);
+        closedir(d);
+        printf("iOS app: shader folder:%s\n", line);
+    }
+}
 #include <libgen.h>
 #include <mach-o/dyld.h>
 /* The recompiled library (about 350 MB) needs one gap of its size in the address space. Inside
@@ -602,6 +650,7 @@ static int start(const char *data_dir) {
     }
     printf("iOS PoC: Documents %s, recompiled library %s\n", documents,
            access(library, R_OK) ? "missing (interpreter only)" : library);
+    report_game_folder(documents);
     report_address_space();
     if (switch_on("BB_IOS_GUARD_TEST")) guard_test();
     if (switch_on("BB_IOS_METAL_TEST")) bb_ios_metal_test((unsigned)strtoul(getenv("BB_IOS_METAL_TEST"), NULL, 10));
